@@ -31,8 +31,9 @@ Player profiles are stored on the memory card (`ux0:data/tanks/profiles/`). Up t
 
 ## Extras
 
-- Bonus items: grenade, helmet, clock, shovel, tank, star, gun, boat.
-- Enemy types A–D with different armour levels and behaviour, hunters (red) and base destroyers in Deathmatch.
+- Bonus items: grenade, helmet, clock, shovel, tank, star, gun, boat, drone strike and AI friend.
+- Enemy types A–D with different armour levels and behaviour.
+- Special tanks in Deathmatch: red hunter (stalks you), blue base destroyer (goes for your eagle), yellow AI ally.
 - AI friend tank (optional, Deathmatch).
 
 ## Building for PS Vita
@@ -105,6 +106,12 @@ If enemy blinks, each hit create new bonus item on a map.
     - behaviour: 50% chance to move towards the target, 50% chance to move in random direction,
       fires if target is in front of
 
+### Special tanks (Deathmatch)
+
+ - **Hunter** (marked red): spawns every third enemy on MEDIUM and rotates on HARD. It has the ally's disciplined logic, but its one and only goal is **the player** — it locks onto you and stalks relentlessly.
+ - **Base destroyer** (marked blue): appears in the HARD rotation. Its single mission is **your eagle** — it drives straight for the base at the bottom of the map and will not be distracted.
+ - **Ally** (marked yellow): your AI friend tank. Fights on your side, defends the eagle and supports you in battle. Can be enabled on the Deathmatch setup screen or spawned with the Friend bonus.
+
 ## Bonus items
 
  - ![Bonus grenade](resources/img/bonus_grenade.png) Grenade: all enemies are destroyed
@@ -115,6 +122,8 @@ If enemy blinks, each hit create new bonus item on a map.
  - ![Bonus star](resources/img/bonus_star.png) Star: increase player speed, each next one increases max bullets count
  - ![Bonus gun](resources/img/bonus_gun.png) Gun: same as three stars
  - ![Bonus boat](resources/img/bonus_boat.png) Boat: allows to move on the water
+ - ![Bonus drone](resources/img/bonus_drone.png) Drone: the game freezes and a crosshair appears — pick any enemy tank with the D-Pad and press **X** to strike it from the air (**O** to cancel). Drops in Generated and Deathmatch (in Deathmatch it lands over the middle of the map)
+ - ![Bonus friend](resources/img/bonus_friend.png) Friend: spawns an AI ally tank on your side (only one at a time). Drops in Generated and Survival (in Survival it lands over the middle of the map)
 
 ## Stages
 
