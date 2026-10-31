@@ -2,7 +2,7 @@
 
 ![Tanks 2027](docs/bg.png)
 
-Port of Battle City / Tank 1990 to the **PS Vita**, based on [krystiankaluzny/Tanks](https://github.com/krystiankaluzny/Tanks).
+Port of Battle City / Tank 1990 to the **PS Vita** and **PSP**, based on [krystiankaluzny/Tanks](https://github.com/krystiankaluzny/Tanks).
 The game is written in C++11 and uses the SDL2 2D graphics library.
 
 ## Game modes
@@ -16,15 +16,17 @@ High scores are tracked separately for every mode.
 
 ## Profiles
 
-Player profiles are stored on the memory card (`ux0:data/tanks/profiles/`). Up to 6 characters per name, selectable on startup.
+Player profiles are stored on the memory card (`ux0:data/tanks/profiles/` on PS Vita, `ms0:/PSP/GAME/TANKS/data/profiles/` on PSP). Up to 6 characters per name, selectable on startup.
 
-## Controls (PS Vita)
+## Controls (PS Vita / PSP)
 
 - Move: D-Pad
 - Fire: Cross
 - Pause: Start (RETURN / MAIN MENU)
 - Confirm: Cross, Back: Circle
 - Deathmatch setup: Cross / Left / Right to change, Start to play, Circle to go back
+
+On the PSP the controls are identical; the on-screen keyboard is used to enter a profile name.
 
 ## Extras
 
@@ -51,6 +53,38 @@ powershell -ExecutionPolicy Bypass -File .\build_vita.ps1
 
 As a result **build-vita** directory should be created with **Tanks.vpk**.
 Copy it to your Vita and install (e.g. via VitaShell).
+
+## Building for PSP
+
+The PSP build produces an **EBOOT.PBP** plus a loose **assets/** folder.
+
+### Requirements
+
+- [pspdev SDK](https://pspdev.github.io) installed inside **WSL** (the official way on Windows) at `~/pspdev`
+- CMake and `make` inside WSL
+
+The pspdev SDK ships prebuilt SDL2, SDL2_image, SDL2_ttf, SDL2_mixer and all
+codec/font/image dependencies, so nothing extra has to be compiled.
+
+### Build
+
+In the project directory run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build_psp.ps1
+```
+
+This invokes `build_psp.sh` inside WSL (`Ubuntu`). As a result the **build-psp**
+directory is created with **EBOOT.PBP** and **assets/**.
+
+### Install
+
+Copy the **contents** of `build-psp/` (both `EBOOT.PBP` and the `assets/`
+folder) into `ms0:/PSP/GAME/TANKS/` on the memory stick, then launch
+"Tanks 2027" from the XMB (or Adrenaline on a PS Vita).
+
+> The game loads its assets from `ms0:/PSP/GAME/TANKS/assets/`, so keep the
+> install folder named `TANKS`.
 
 ## Building for PC (original)
 

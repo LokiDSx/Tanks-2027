@@ -1,7 +1,7 @@
 #include "tank_effect.h"
 #include "tank.h"
 
-TankEffect::TankEffect(unsigned id, Tank* tank, Object *object, Uint32 treshold_time)
+TankEffect::TankEffect(Uint32 id, Tank* tank, Object *object, Uint32 treshold_time)
     : id(id),
       to_erase(false),
       m_tank(tank),

@@ -1,8 +1,8 @@
 #include "sdl_engine.h"
 #include "sdl_event_mapper.h"
 
-#ifdef VITA_PORT
-#include "vita_input.h"
+#ifdef CONSOLE_PORT
+#include "console_input.h"
 #endif
 
 #include <random>
@@ -14,10 +14,22 @@
 #include <SDL2/SDL_ttf.h>
 #include <iostream>
 
-#ifdef VITA_PORT
-// Native PS Vita display resolution
-static const int VITA_DISPLAY_WIDTH = 960;
-static const int VITA_DISPLAY_HEIGHT = 544;
+#if defined(CONSOLE_PORT)
+// Native display resolution of the target console
+static const int CONSOLE_DISPLAY_WIDTH =
+#if defined(PSP_PORT)
+    480
+#else
+    960
+#endif
+    ;
+static const int CONSOLE_DISPLAY_HEIGHT =
+#if defined(PSP_PORT)
+    272
+#else
+    544
+#endif
+    ;
 #endif
 
 SDLEngine::~SDLEngine()
@@ -51,7 +63,7 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
     is_main_loop_running = true;
 
     Uint32 init_flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
     init_flags |= SDL_INIT_JOYSTICK;
 #endif
 
@@ -71,11 +83,11 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
         }
         srand(seed);
 
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
         // The game renders its native 464x416 viewport scaled to the whole
         // display with aspect-ratio-corrected black bars (see SDLRenderer).
         m_window = SDL_CreateWindow(m_config.window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                    VITA_DISPLAY_WIDTH, VITA_DISPLAY_HEIGHT, SDL_WINDOW_SHOWN);
+                                    CONSOLE_DISPLAY_WIDTH, CONSOLE_DISPLAY_HEIGHT, SDL_WINDOW_SHOWN);
 #else
         m_window = SDL_CreateWindow(m_config.window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                     m_config.initial_window_size.w, m_config.initial_window_size.h, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
@@ -88,9 +100,9 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
 
         initComponents();
 
-#ifdef VITA_PORT
-        m_renderer->setViewportForWindowSize({VITA_DISPLAY_WIDTH, VITA_DISPLAY_HEIGHT});
-        VitaInput::init();
+#ifdef CONSOLE_PORT
+        m_renderer->setViewportForWindowSize({CONSOLE_DISPLAY_WIDTH, CONSOLE_DISPLAY_HEIGHT});
+        ConsoleInput::init();
 #endif
 
         if (onEngineInit(*this) == ProcessingResult::STOP)
@@ -167,8 +179,8 @@ ProcessingResult SDLEngine::handleEvents(HandleEventFunc handleEvent)
             return ProcessingResult::STOP;
         }
 
-#ifdef VITA_PORT
-        VitaInput::handleEvent(sdl_event, events);
+#ifdef CONSOLE_PORT
+        ConsoleInput::handleEvent(sdl_event, events);
 #endif
 
         Event *e = mapSDLEventToEngineEvent(sdl_event);
@@ -182,8 +194,8 @@ ProcessingResult SDLEngine::handleEvents(HandleEventFunc handleEvent)
         }
     }
 
-#ifdef VITA_PORT
-    VitaInput::pollRepeats(events);
+#ifdef CONSOLE_PORT
+    ConsoleInput::pollRepeats(events);
 #endif
 
     for (size_t i = 0; i < events.size(); ++i)

@@ -49,6 +49,23 @@ private:
     Uint32 m_close_grace;
     // Cursor blink timer
     Uint32 m_blink;
+#ifdef PSP_PORT
+    // On-screen keyboard cursor position in the character grid (the PSP has
+    // no system keyboard, so names are picked from an on-screen grid)
+    int m_kb_row;
+    int m_kb_col;
+
+    /**
+     * Move the on-screen keyboard cursor by one cell, skipping empty cells.
+     */
+    void adjustCursor(int dr, int dc);
+
+    /**
+     * Apply the on-screen keyboard cell under the cursor (insert a character,
+     * delete the last one, or confirm the name).
+     */
+    void activateCursorCell();
+#endif
 
     /**
      * (Re)open the system keyboard on the PS Vita; clears the pending

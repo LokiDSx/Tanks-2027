@@ -46,8 +46,8 @@ void Game::PlayingState::eventProcess(const Event &event)
         {
             transiteTo(new Game::PauseState(m_context));
         }
-#ifndef VITA_PORT
-        // On PS Vita ESCAPE is mapped to the Circle button, which is too easy
+#ifndef CONSOLE_PORT
+        // On PS Vita/PSP ESCAPE is mapped to the Circle button, which is too easy
         // to press by accident; there the level can be left from the pause menu.
         else if (event_key.isPressed(KEY_ESCAPE))
         {

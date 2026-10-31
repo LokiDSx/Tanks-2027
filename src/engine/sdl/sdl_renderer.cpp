@@ -45,7 +45,7 @@ void SDLRenderer::loadTexture(SDL_Window *window)
 {
     m_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
     if (m_renderer == nullptr)
     {
         m_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -76,7 +76,7 @@ void SDLRenderer::clear()
         applyViewport();
     }
 
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
     // Black bars around the aspect-ratio-corrected game viewport, grey
     // background inside the viewport. Clear ignores the viewport, so it is
     // explicitly reset and restored here.
@@ -153,7 +153,7 @@ void SDLRenderer::applyViewport()
         SDL_Rect viewport = {0, 0, width, height};
         SDL_RenderSetScale(m_renderer, width / (float)m_viewport_base_size.w, height / (float)m_viewport_base_size.h);
         SDL_RenderSetViewport(m_renderer, &viewport);
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
         m_viewport = viewport;
 #endif
     }
@@ -176,7 +176,7 @@ void SDLRenderer::applyViewport()
 
         SDL_RenderSetScale(m_renderer, scale, scale);
         SDL_RenderSetViewport(m_renderer, &viewport);
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
         m_viewport = viewport;
 #endif
     }

@@ -9,6 +9,8 @@
 
 #ifdef VITA_PORT
 #include <psp2/io/stat.h>
+#elif defined(PSP_PORT)
+#include <pspiofilemgr.h> // sceIoMkdir
 #else
 #ifdef _WIN32
 #include <direct.h>
@@ -34,6 +36,13 @@ namespace
         sceIoMkdir("ux0:data", 0777); // fails harmlessly if the dir exists
         sceIoMkdir("ux0:data/tanks", 0777);
         return "ux0:data/tanks/";
+#elif defined(PSP_PORT)
+        // The port stores its data next to the game under a data/ folder
+        sceIoMkdir("ms0:/PSP", 0777);           // fails harmlessly if the dir exists
+        sceIoMkdir("ms0:/PSP/GAME", 0777);
+        sceIoMkdir("ms0:/PSP/GAME/TANKS", 0777);
+        sceIoMkdir("ms0:/PSP/GAME/TANKS/data", 0777);
+        return "ms0:/PSP/GAME/TANKS/data/";
 #else
         // SDL_GetPrefPath creates the directory if it does not exist
         char *dir = SDL_GetPrefPath("vita", "tanks");
@@ -52,6 +61,8 @@ namespace
             return "";
 #ifdef VITA_PORT
         sceIoMkdir("ux0:data/tanks/profiles", 0777);
+#elif defined(PSP_PORT)
+        sceIoMkdir((base + "profiles").c_str(), 0777);
 #else
 #ifdef _WIN32
         _mkdir((base + "profiles").c_str());

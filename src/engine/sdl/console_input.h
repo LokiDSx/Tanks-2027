@@ -1,5 +1,5 @@
-#ifndef VITA_INPUT_H
-#define VITA_INPUT_H
+#ifndef CONSOLE_INPUT_H
+#define CONSOLE_INPUT_H
 
 #include "../data/event.h"
 #include "../data/keycode.h"
@@ -7,11 +7,13 @@
 #include <SDL2/SDL.h>
 #include <vector>
 
-// PS Vita gamepad input.
+// Console gamepad input (shared by the PS Vita and PSP ports).
 //
-// The whole game logic is keyboard driven, so pad input is translated into
-// synthetic keyboard events. Button indices follow SDL's native Vita joystick
-// driver (src/joystick/vita/SDL_sysjoystick.c):
+// Both consoles are driven through SDL2's native joystick drivers, whose
+// button indices are identical for the Vita and the PSP, so a single mapping
+// serves both. The whole game logic is keyboard driven, so pad input is
+// translated into synthetic keyboard events. Button indices follow SDL's
+// native Vita/PSP joystick drivers (src/joystick/vita, src/joystick/psp):
 //
 //   D-Pad / left stick ... arrows (movement, menu navigation, with key repeat)
 //   Cross / Square / R ... fire (RCTRL) + confirm (SPACE)
@@ -19,7 +21,7 @@
 //   Start ................ RETURN (pause / confirm)
 //   Select ............... T (show/hide enemy targets)
 
-namespace VitaInput
+namespace ConsoleInput
 {
     enum JoyButton
     {
@@ -242,4 +244,4 @@ namespace VitaInput
     }
 }
 
-#endif // VITA_INPUT_H
+#endif // CONSOLE_INPUT_H

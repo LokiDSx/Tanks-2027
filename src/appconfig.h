@@ -22,6 +22,9 @@ namespace AppConfig
 #ifdef VITA_PORT
     // Assets are packed into the VPK under the app root: ux0:app/TANK00001/assets/
     inline string assets_dir = "app0:/assets/";
+#elif defined(PSP_PORT)
+    // Assets sit next to EBOOT.PBP in the install folder (default: ms0:/PSP/GAME/TANKS/)
+    inline string assets_dir = "ms0:/PSP/GAME/TANKS/assets/";
 #else
     inline string assets_dir = "";
 #endif

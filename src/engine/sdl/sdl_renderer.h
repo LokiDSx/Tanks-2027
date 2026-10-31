@@ -38,7 +38,7 @@ private:
     SDL_Texture *m_text_texture;
     std::unordered_map<FontSize, TTF_Font *> m_fonts;
     bool m_fullscreen;
-#ifdef VITA_PORT
+#ifdef CONSOLE_PORT
     SDL_Rect m_viewport{0, 0, 0, 0};
 #endif
 };
