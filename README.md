@@ -5,9 +5,6 @@
 Port of Battle City / Tank 1990 to the **PS Vita**, based on [krystiankaluzny/Tanks](https://github.com/krystiankaluzny/Tanks).
 The game is written in C++11 and uses the SDL2 2D graphics library.
 
-![Start menu](resources/img/start.png)
-![Stage one](resources/img/stage_1.png)
-
 ## Game modes
 
 - **Classic** — the classic Battle City campaign: clear 13 stages, protect your eagle.
