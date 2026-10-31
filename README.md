@@ -5,6 +5,9 @@
 Port of Battle City / Tank 1990 to the **PS Vita**, based on [krystiankaluzny/Tanks](https://github.com/krystiankaluzny/Tanks).
 The game is written in C++11 and uses the SDL2 2D graphics library.
 
+![Start menu](resources/img/start.png)
+![Stage one](resources/img/stage_1.png)
+
 ## Game modes
 
 - **Classic** — the classic Battle City campaign: clear 13 stages, protect your eagle.
@@ -81,22 +84,22 @@ If enemy blinks, each hit create new bonus item on a map.
 
 ### Enemy types
 
- - A type:
+ - ![Enemy A](resources/img/enemy_a.png) A type:
     - target: closest player or eagle;
     - speed: base;
     - behaviour: 80% chance to move towards the target, 20% chance to move in random direction,
       constantly fires in movement direction
- - B type:
+ - ![Enemy B](resources/img/enemy_b.png) B type:
     - target: eagle;
     - speed: 1.3 * base;
     - behaviour: 50% chance to move towards the target, 50% chance to move in random direction,
       constantly fires in movement direction
- - C type:
+ - ![Enemy C](resources/img/enemy_c.png) C type:
     - target: eagle;
     - speed: base;
     - behaviour: 50% chance to move towards the target, 50% chance to move in random direction,
       constantly fires in movement direction
- - D type:
+ - ![Enemy D](resources/img/enemy_d.png) D type:
     - target: closest player or eagle;
     - speed: base;
     - behaviour: 50% chance to move towards the target, 50% chance to move in random direction,
@@ -104,14 +107,14 @@ If enemy blinks, each hit create new bonus item on a map.
 
 ## Bonus items
 
- - Grenade: all enemies are destroyed
- - Helmet: active player shield for 10 seconds
- - Clock: freeze all enemies for 8 seconds
- - Shovel: create stone wall around eagle for 15 seconds
- - Tank: increase player lives count
- - Star: increase player speed, each next one increases max bullets count
- - Gun: same as three stars
- - Boat: allows to move on the water
+ - ![Bonus grenade](resources/img/bonus_grenade.png) Grenade: all enemies are destroyed
+ - ![Bonus helmet](resources/img/bonus_helmet.png) Helmet: active player shield for 10 seconds
+ - ![Bonus clock](resources/img/bonus_clock.png) Clock: freeze all enemies for 8 seconds
+ - ![Bonus shovel](resources/img/bonus_shovel.png) Shovel: create stone wall around eagle for 15 seconds
+ - ![Bonus tank](resources/img/bonus_tank.png) Tank: increase player lives count
+ - ![Bonus star](resources/img/bonus_star.png) Star: increase player speed, each next one increases max bullets count
+ - ![Bonus gun](resources/img/bonus_gun.png) Gun: same as three stars
+ - ![Bonus boat](resources/img/bonus_boat.png) Boat: allows to move on the water
 
 ## Stages
 
@@ -120,11 +123,11 @@ Each stage is a two-dimensional array with 26 rows and 26 columns.
 Each field in the array should be one of following elements:
 
  - **.** Empty field
- - **#** Brick wall: it can be destroyed with two bullets or one if you collect three Stars or Gun
- - **@** Stone wall: it can be destroyed only if you collect three Stars or Gun bonus
- - **%** Bush: it can be erased only if you collect three Stars or Gun bonus
- - **~** Water: it is natural obstacle unless you collect Boat bonus
- - **-** Ice: tanks are slipping on it
+ - **#** ![Brick wall](resources/img/brick.png) Brick wall: it can be destroyed with two bullets or one if you collect three Stars or Gun
+ - **@** ![Stone wall](resources/img/stone.png) Stone wall: it can be destroyed only if you collect three Stars or Gun bonus
+ - **%** ![Bush](resources/img/bush.png) Bush: it can be erased only if you collect three Stars or Gun bonus
+ - **~** ![Water](resources/img/water.png) Water: it is natural obstacle unless you collect Boat bonus
+ - **-** ![Ice](resources/img/ice.png) Ice: tanks are slipping on it
 
 ## License
 
