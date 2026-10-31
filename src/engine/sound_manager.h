@@ -22,16 +22,21 @@ struct Sound
 
 class SoundManager
 {
-private:
-    /* data */
 public:
     SoundManager() = default;
     virtual ~SoundManager() = default;
+
+    // Global sound toggle (Settings menu): while muted, play() is a no-op.
+    void setMuted(bool muted) { m_muted = muted; }
+    bool isMuted() const { return m_muted; }
 
     virtual void preload(const Sound &sound) = 0;
     virtual void play(const Sound &sound) = 0;
     virtual void stop(const Sound &sound) = 0;
     virtual void stopAll() = 0;
+
+protected:
+    bool m_muted = false;
 };
 
 #endif // ENGINE_SOUND_MANAGER_H

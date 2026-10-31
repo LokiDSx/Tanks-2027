@@ -28,6 +28,8 @@ enum SpriteType
     ST_BONUS_STAR,
     ST_BONUS_GUN,
     ST_BONUS_BOAT,
+    ST_BONUS_DRONE,
+    ST_BONUS_FRIEND,
 
     ST_SHIELD,
     ST_CREATE,
@@ -43,6 +45,9 @@ enum SpriteType
     ST_BULLET,
 
     ST_LEFT_ENEMY,
+    // White copy of ST_LEFT_ENEMY, used for the survival destroyed-tanks
+    // counter on dark backgrounds (the black one blends into them)
+    ST_LEFT_ENEMY_WHITE,
     ST_STAGE_STATUS,
 
     ST_TANKS_LOGO,

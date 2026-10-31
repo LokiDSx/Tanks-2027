@@ -4,16 +4,23 @@
 #include "../appconfig.h"
 #include "../soundconfig.h"
 #include "../high_score.h"
+#include "../profile.h"
 #include "game/game.h"
 #include "menu.h"
 
-Scores::Scores(std::vector<Player *> players, int stage, bool game_over, InteractiveComponents interactive_components, StateMachine *state_machine)
+Scores::Scores(std::vector<Player *> players, int stage, bool game_over, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, unsigned tanks_killed, int deathmatch_difficulty, bool friend_enabled)
     : AppState(interactive_components, state_machine),
       m_scores_state_machine(new StateMachine())
 {
     m_players = players;
     m_stage = stage;
     m_game_over = game_over;
+    m_generated = generated;
+    m_survival = survival;
+    m_deathmatch = deathmatch;
+    m_tanks_killed = tanks_killed;
+    m_deathmatch_difficulty = deathmatch_difficulty;
+    m_friend_enabled = friend_enabled;
 
     m_score_counter = 0;
     m_max_score = 0;
@@ -22,6 +29,17 @@ Scores::Scores(std::vector<Player *> players, int stage, bool game_over, Interac
 Scores::~Scores()
 {
     delete m_scores_state_machine;
+}
+
+HighScore::Mode Scores::highScoreMode() const
+{
+    if (m_survival)
+        return HighScore::Mode::Survival;
+    if (m_deathmatch)
+        return HighScore::Mode::Deathmatch;
+    if (m_generated)
+        return HighScore::Mode::Generated;
+    return HighScore::Mode::Classic;
 }
 
 void Scores::onInitialize()
@@ -59,7 +77,16 @@ void Scores::drawScore(Renderer &renderer)
 
     p_dst = {-1, 15};
     Color text_color = {255, 255, 255, 255};
-    renderer.drawText(p_dst, "HI- " + std::to_string(HighScore::score), text_color, FontSize::NORMAL);
+    renderer.drawText(p_dst, "HI- " + std::to_string(HighScore::forMode(highScoreMode())), text_color, FontSize::NORMAL);
+
+    if (m_survival)
+    {
+        // Tanks destroyed during this run, top right of the screen
+        const std::string tanks_text = "TANKS- " + std::to_string(m_tanks_killed);
+        Size tanks_size = renderer.measureText(tanks_text, FontSize::NORMAL);
+        Point tanks_dst = {AppConfig::windows_rect.w - 8 - tanks_size.w, 15};
+        renderer.drawText(tanks_dst, tanks_text, text_color, FontSize::NORMAL);
+    }
 
     p_dst = {-1, 40};
     renderer.drawText(p_dst, std::string("STAGE ") + std::to_string(m_stage), {255, 255, 220, 255}, FontSize::BIGGEST);
@@ -109,7 +136,7 @@ void Scores::transiteToNextState()
     }
     else
     {
-        Game *g = new Game(m_players, m_stage, m_interactive_components, m_state_machine);
+        Game *g = new Game(m_players, m_stage, m_interactive_components, m_state_machine, m_generated, m_survival, m_deathmatch, m_deathmatch_difficulty, m_friend_enabled);
         transiteTo(g);
     }
 }
@@ -201,6 +228,13 @@ void Scores::IdleState::eventProcess(const Event &event)
 
 void Scores::IdleState::checkHighScoreAndTransite()
 {
+    // Survival: the destroyed tanks counter is fixed as a record
+    if (m_context->m_survival && m_context->m_tanks_killed > HighScore::survival_tanks)
+    {
+        HighScore::survival_tanks = m_context->m_tanks_killed;
+        Profile::save();
+    }
+
     if (m_context->m_game_over)
     {
         unsigned max_score = 0;
@@ -210,8 +244,9 @@ void Scores::IdleState::checkHighScoreAndTransite()
                 max_score = player->score();
         }
 
-        if (HighScore::checkAndUpdate(max_score))
+        if (HighScore::checkAndUpdate(m_context->highScoreMode(), max_score))
         {
+            Profile::save();
             transiteTo(new Scores::HighScoreState(m_context));
             return;
         }
@@ -247,7 +282,7 @@ void Scores::HighScoreState::draw(Renderer &renderer)
     renderer.drawText(p_dst, "HISCORE", text_color, FontSize::FS_60);
 
     p_dst = {-1, 180};
-    renderer.drawText(p_dst, std::to_string(HighScore::score), text_color, FontSize::FS_48);
+    renderer.drawText(p_dst, std::to_string(HighScore::forMode(m_context->highScoreMode())), text_color, FontSize::FS_48);
 }
 
 void Scores::HighScoreState::update(const UpdateState &updateState)

@@ -24,6 +24,8 @@ SpriteConfig::SpriteConfig()
     insert(ST_BONUS_STAR, {896, 160, 32, 32}, 1, 200, false);
     insert(ST_BONUS_GUN, {896, 192, 32, 32}, 1, 200, false);
     insert(ST_BONUS_BOAT, {896, 224, 32, 32}, 1, 200, false);
+    insert(ST_BONUS_DRONE, {896, 256, 32, 32}, 1, 200, false);
+    insert(ST_BONUS_FRIEND, {896, 288, 32, 32}, 1, 200, false);
 
     insert(ST_SHIELD, {976, 0, 32, 32}, 2, 45, true);
     insert(ST_CREATE, {1008, 0, 32, 32}, 10, 100, false);
@@ -38,6 +40,7 @@ SpriteConfig::SpriteConfig()
 
     insert(ST_BULLET, {944, 128, 8, 8}, 1, 200, false);
     insert(ST_LEFT_ENEMY, {944, 144, 16, 16}, 1, 200, false);
+    insert(ST_LEFT_ENEMY_WHITE, {944, 336, 16, 16}, 1, 200, false);
     insert(ST_STAGE_STATUS, {976, 64, 32, 32}, 1, 200, false);
 
     insert(ST_TANKS_LOGO, {0, 260, 406, 72}, 1, 200, false);

@@ -20,7 +20,8 @@ void Enemy::CreatingState::onInitialize()
     enemy->dest_rect = Rect{(int)enemy->pos_x, (int)enemy->pos_y, sprite->rect.w, sprite->rect.h};
     enemy->collision_rect = Rect{0, 0, 0, 0};
 
-    enemy->setDirection(D_DOWN);
+    // The ally spawns facing the enemy base at the top of the map
+    enemy->setDirection(enemy->m_friendly ? D_UP : D_DOWN);
 
     for (auto b : enemy->bullets)
         b->to_erase = true;

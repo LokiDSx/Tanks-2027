@@ -48,7 +48,14 @@ void Enemy::AliveState::update(const UpdateState &updateState)
         }
     }
 
-    if (enemy->m_bonus)
+    if (enemy->m_friendly)
+    {
+        // The ally uses the player sprite: rows are directions, the frame
+        // column depends on the armor level (like Player::AliveState does)
+        unsigned armor_for_sprite = enemy->m_armor_count > 3 ? 3 : enemy->m_armor_count;
+        enemy->src_rect = sprite->rect.tiledOffset(enemy->m_tank_direction, enemy->m_current_frame + 2 * armor_for_sprite);
+    }
+    else if (enemy->m_bonus)
         enemy->src_rect = sprite->rect.tiledOffset(enemy->m_tank_direction - 4, enemy->m_current_frame);
     else
         enemy->src_rect = sprite->rect.tiledOffset(enemy->m_tank_direction + (enemy->m_armor_count - 1) * 4, enemy->m_current_frame);

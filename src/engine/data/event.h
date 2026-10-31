@@ -4,6 +4,8 @@
 #include "keycode.h"
 #include "data.h"
 
+#include <string>
+
 class Event
 {
 public:
@@ -11,6 +13,7 @@ public:
     {
         UNKNOWN,
         KEYBOARD,
+        TEXT_INPUT,
         WINDOW,
         QUIT
     };
@@ -59,6 +62,18 @@ private:
     KeyCode m_key_code;
     KeyState m_key_state;
     unsigned int m_key_mods;
+};
+
+class TextInputEvent : public Event
+{
+public:
+    explicit TextInputEvent(const std::string &text)
+        : Event(EventType::TEXT_INPUT), m_text(text) {};
+
+    const std::string &text() const { return m_text; }
+
+private:
+    std::string m_text;
 };
 
 class WindowEvent : public Event

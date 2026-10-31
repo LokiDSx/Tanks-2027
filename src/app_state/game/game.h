@@ -16,8 +16,16 @@
 class Game : public AppState
 {
 public:
-    Game(int players_count, int starting_stage, InteractiveComponents interactive_components, StateMachine *state_machine);
-    Game(std::vector<Player *> players, int previous_stage, InteractiveComponents interactive_components, StateMachine *state_machine);
+    // Deathmatch difficulties (chosen on the Deathmatch setup screen)
+    enum DeathmatchDifficulty
+    {
+        DM_EASY = 0,
+        DM_MEDIUM = 1,
+        DM_HARD = 2,
+    };
+
+    Game(int players_count, int starting_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated = false, bool survival = false, bool deathmatch = false, int deathmatch_difficulty = DM_MEDIUM, bool friend_enabled = true);
+    Game(std::vector<Player *> players, int previous_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated = false, bool survival = false, bool deathmatch = false, int deathmatch_difficulty = DM_MEDIUM, bool friend_enabled = true);
     ~Game();
 
     void draw(Renderer &renderer) override;
@@ -39,6 +47,10 @@ protected:
 private:
     void clearAll();
     void createPlayersIfNeeded();
+    // Deathmatch: spawn the friendly tank at the second player's point
+    void createFriendlyIfNeeded();
+    // Spawn the ally (no-op while one is already alive on the map)
+    void spawnFriendly();
 
     void drawScene(Renderer &renderer);
     void drawObjects(Renderer &renderer);
@@ -58,10 +70,19 @@ private:
 
     void calculateEnemiesTargets();
     void generateEnemyIfPossible(Uint32 dt);
+    void countKill();
 
     void generateBonus();
+    // Put the given bonus in the middle of the map
+    void placeBonusInMapCenter(Bonus *b);
+    // Drop a fresh bonus of the given type in the middle of the map
+    void spawnBonusAtCenter(SpriteType type);
 
     void transiteToGameOver();
+    // Deathmatch: the enemy base is destroyed — the stage is won
+    void transiteToStageComplete();
+    // Drone bonus: freeze the game and let the player pick a tank to destroy
+    void startDroneTargeting(Player *player);
 
     StateMachine *m_game_state_machine;
     StageEnvironment *m_stage_environment;
@@ -77,8 +98,29 @@ private:
 
     Uint32 m_new_enemy_cooldown;
     unsigned m_enemy_respown_position;
+    // Deathmatch: spawn rotation counter (every third spawned enemy gets
+    // the hunter's brain on Medium, on Hard the rotation is
+    // max-stats / hunter / base-killer)
+    unsigned m_hunter_spawn_counter;
 
     bool m_show_enemies_targets;
+    bool m_generated;
+    bool m_survival;
+    bool m_deathmatch;
+    // Deathmatch setup: difficulty and whether the friendly tank spawns
+    int m_deathmatch_difficulty;
+    bool m_friend_enabled;
+    // No new enemies spawn once the stage is over (e.g. the Deathmatch base
+    // was destroyed while the stage ending state is still updating the scene)
+    bool m_stage_finished;
+    int m_kills;
+
+    // Deathmatch: the friendly tank (an entry of m_enemies while it is alive)
+    Enemy *m_friend;
+    Uint32 m_friend_respawn_time;
+
+    // Drone bonus: the player that picked it up, waiting for DroneTargetState
+    Player *m_pending_drone_player;
 
     // Sub-states
     class StartingState : public ContextState<Game>
@@ -115,6 +157,8 @@ private:
         bool m_game_over;
     };
 
+    // Pause menu: RETURN goes back to the game, MAIN MENU leaves the
+    // level and opens the main menu.
     class PauseState : public ContextState<Game>
     {
     public:
@@ -125,6 +169,43 @@ private:
 
     protected:
         void onInitialize() override;
+
+    private:
+        // Index of the selected menu item (0 - RETURN, 1 - MAIN MENU)
+        int m_selected;
+
+        /** Applies the selected menu item. */
+        void activateSelected();
+    };
+
+    // Drone bonus: the game freezes and the player steers a crosshair over
+    // the map; the tank under the crosshair is destroyed on the fire button.
+    class DroneTargetState : public ContextState<Game>
+    {
+    public:
+        DroneTargetState(Game *ps);
+        void draw(Renderer &renderer) override;
+        void update(const UpdateState &updateState) override;
+        void eventProcess(const Event &event) override;
+
+        // Player that picked the drone up; it becomes the operator here.
+        // Public: Game::startDroneTargeting() hands the remote over right
+        // after the state is created.
+        void setOwner(Player *player);
+
+    protected:
+        void onInitialize() override;
+
+    private:
+        // Pointer to the tank currently under the crosshair; null if none.
+        // Enemies are never deleted while this state runs (the scene is
+        // frozen), so the pointer stays valid for the whole state.
+        Tank *tankUnderCursor() const;
+        void destroyTarget();
+        void finish();
+
+        Point m_cursor;
+        Player *m_owner;
     };
 
     class GameOverState : public ContextState<Game>

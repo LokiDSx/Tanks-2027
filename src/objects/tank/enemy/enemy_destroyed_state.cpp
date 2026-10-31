@@ -11,6 +11,10 @@ void Enemy::DestroyedState::onInitialize()
     const SpriteData *sprite = &SpriteConfig::getInstance().getSpriteData(ST_DESTROY_TANK);
     enemy->m_sprite = sprite;
 
+    // The explosion plays in the original colors: the role tint (red/blue)
+    // only marks the living tank
+    enemy->m_tint = {255, 255, 255, 255};
+
     enemy->m_speed = 0.0;
     enemy->m_blocked = true;
     enemy->m_current_frame = 0;

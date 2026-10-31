@@ -1,4 +1,5 @@
 #include "sdl_sound_manager.h"
+#include "../../appconfig.h"
 #include "../data/error.h"
 #include <iostream>
 
@@ -43,6 +44,11 @@ void SDLSoundManager::preload(const Sound &sound)
 
 void SDLSoundManager::play(const Sound &sound)
 {
+    if (isMuted())
+    {
+        return;
+    }
+
     if (!canPlay(sound))
     {
         return;
@@ -57,13 +63,9 @@ void SDLSoundManager::play(const Sound &sound)
 
     auto matching_sounds = findAllMatchingSounds(sound);
 
-    Sound sound_to_load;
+    double play_volume = sound.volume;
 
-    if (matching_sounds.empty())
-    {
-        sound_to_load = sound;
-    }
-    else
+    if (!matching_sounds.empty())
     {
         // Find the lowest volume among matching sounds to play a quieter version to prevent clipping
         double min_volume = 100.0;
@@ -75,19 +77,25 @@ void SDLSoundManager::play(const Sound &sound)
             }
         }
 
-        sound_to_load = Sound{sound.file_path, min_volume * sound.overlapping_factor, sound.overlapping_factor, sound.multi_instance, sound.highest_priority};
+        play_volume = min_volume * sound.overlapping_factor;
     }
 
-    Mix_Chunk *chunk = loadSound(sound_to_load);
+    Mix_Chunk *chunk = loadSound(sound);
 
     int loops = 0;
     int channel = Mix_PlayChannel(-1, chunk, loops);
     if (channel == -1)
     {
-        std::cerr << "Warning: Unable to play sound: " << sound_to_load.file_path << " Error: " << Mix_GetError() << std::endl;
+        std::cerr << "Warning: Unable to play sound: " << sound.file_path << " Error: " << Mix_GetError() << std::endl;
+        return;
     }
 
-    m_current_channel_chunk_cache[channel] = std::make_pair(sound_to_load, chunk);
+    int sdl_volume = static_cast<int>(MIX_MAX_VOLUME * (play_volume / 100.0));
+    Mix_Volume(channel, sdl_volume);
+
+    Sound sound_state = sound;
+    sound_state.volume = play_volume;
+    m_current_channel_chunk_cache[channel] = std::make_pair(sound_state, chunk);
 }
 
 void SDLSoundManager::stop(const Sound &sound)
@@ -112,22 +120,19 @@ void SDLSoundManager::stopAll()
 Mix_Chunk *SDLSoundManager::loadSound(const Sound &sound)
 {
     const std::string &file_path = sound.file_path;
-    auto it = m_sound_cache.find(sound);
+    auto it = m_sound_cache.find(file_path);
     if (it != m_sound_cache.end())
     {
         return it->second;
     }
 
-    Mix_Chunk *chunk = Mix_LoadWAV(file_path.c_str());
+    Mix_Chunk *chunk = Mix_LoadWAV((AppConfig::assets_dir + file_path).c_str());
     if (chunk == nullptr)
     {
         throw Error("Failed to load sound: " + file_path, Mix_GetError());
     }
 
-    int volume = static_cast<int>(MIX_MAX_VOLUME * (sound.volume / 100.0));
-    Mix_VolumeChunk(chunk, volume);
-
-    m_sound_cache[sound] = chunk;
+    m_sound_cache[file_path] = chunk;
     return chunk;
 }
 

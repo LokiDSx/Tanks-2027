@@ -19,11 +19,26 @@ using namespace std;
 
 namespace AppConfig
 {
-    inline string texture_path = "texture.png";
-    inline string stages_path = "stages/";
-    inline string font_path = "kongtext.ttf";
+#ifdef VITA_PORT
+    // Assets are packed into the VPK under the app root: ux0:app/TANK00001/assets/
+    inline string assets_dir = "app0:/assets/";
+#else
+    inline string assets_dir = "";
+#endif
+
+    inline string texture_path = assets_dir + "texture.png";
+    inline string stages_path = assets_dir + "stages/";
+    inline string font_path = assets_dir + "kongtext.ttf";
 
     inline string game_over_text = "GAME OVER";
+
+    // Display mode: true = stretch to fill the screen (widescreen),
+    // false = keep native 464x416 aspect ratio (black bars on the sides).
+    // Default is standard; toggled at runtime from the Settings menu.
+    inline bool widescreen = false;
+
+    // Sound toggle (Settings menu). Applied to the sound manager on startup.
+    inline bool sound_enabled = true;
 
     inline Size map_size  = {26, 26};
     inline Size tile_size = {16, 16};
@@ -45,6 +60,17 @@ namespace AppConfig
         vector<Point> v;
         v.push_back({1, 1});
         v.push_back({12 * tile_size.w, 1});
+        v.push_back({24 * tile_size.w, 1});
+        return v;
+    }();
+
+    // Deathmatch: the middle spawn point would land inside the enemy base,
+    // so enemies pour out from the corridor right below it instead
+    inline vector<Point> enemy_starting_point_deathmatch = []
+    {
+        vector<Point> v;
+        v.push_back({1, 1});
+        v.push_back({12 * tile_size.w, 3 * tile_size.h});
         v.push_back({24 * tile_size.w, 1});
         return v;
     }();
@@ -88,12 +114,14 @@ namespace AppConfig
     inline double   tank_default_speed       = 0.08;
     inline double   bullet_default_speed     = 0.23;
 
+    // Drone bonus: the game freezes and the player picks a tank to destroy
+    inline int      drone_cursor_speed       = 3;
+
     namespace Score
     {
         inline unsigned single_count_time  = 100;
         inline unsigned idle_time          = 5000;
         inline unsigned high_score_time    = 5200;
-        inline unsigned minimal_high_score = 2000;
     }
 
     namespace Game
@@ -101,6 +129,8 @@ namespace AppConfig
         inline unsigned stage_start_time        = 3200;
         inline unsigned stage_end_time          = 5000;
         inline double   game_over_message_speed = 0.13;
+        // Deathmatch: respawn delay of the friendly tank after its death
+        inline unsigned friend_respawn_time     = 2000;
     }
 }
 

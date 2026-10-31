@@ -2,8 +2,9 @@
 #include "../engine/data/data.h"
 
 
-Eagle::Eagle(double x, double y)
-    : Object(x, y, ST_EAGLE)
+Eagle::Eagle(double x, double y, bool enemy_base)
+    : Object(x, y, ST_EAGLE),
+      m_enemy_base(enemy_base)
 {
 }
 
@@ -18,10 +19,18 @@ void Eagle::update(Uint32 dt)
             m_current_frame++;
             if(m_current_frame >= m_sprite->frames_count)
             {
-                m_sprite = &SpriteConfig::getInstance().getSpriteData(ST_FLAG);
-                m_current_frame = 0;
-                type = ST_FLAG;
-                update(0);
+                if (m_enemy_base)
+                {
+                    // The wreck of the enemy base stays until the stage ends
+                    m_current_frame = m_sprite->frames_count - 1;
+                }
+                else
+                {
+                    m_sprite = &SpriteConfig::getInstance().getSpriteData(ST_FLAG);
+                    m_current_frame = 0;
+                    type = ST_FLAG;
+                    update(0);
+                }
             }
             src_rect = m_sprite->rect.tiledOffset(0, m_current_frame);
         }
@@ -42,4 +51,9 @@ void Eagle::destroy()
     dest_rect.y = pos_y + (dest_rect.h - m_sprite->rect.h)/2;
     dest_rect.h = m_sprite->rect.h;
     dest_rect.w = m_sprite->rect.w;
+}
+
+bool Eagle::isEnemyBase() const
+{
+    return m_enemy_base;
 }

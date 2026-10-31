@@ -38,7 +38,13 @@ void Game::StageEndingState::update(const UpdateState &updateState)
                                          m_context->m_current_stage,
                                          m_game_over,
                                          m_context->m_interactive_components,
-                                         m_context->m_state_machine));
+                                         m_context->m_state_machine,
+                                         m_context->m_generated,
+                                         m_context->m_survival,
+                                         m_context->m_deathmatch,
+                                         m_context->m_kills,
+                                         m_context->m_deathmatch_difficulty,
+                                         m_context->m_friend_enabled));
     }
 }
 

@@ -11,7 +11,7 @@
 class StageEnvironment : public InteractiveComponentsHolder
 {
 public:
-    StageEnvironment(int current_stage, InteractiveComponents interactive_components);
+    StageEnvironment(int current_stage, InteractiveComponents interactive_components, bool generated = false, bool survival = false, bool deathmatch = false);
     ~StageEnvironment();
 
     void drawFirstLayer(Renderer &renderer);
@@ -25,17 +25,29 @@ public:
     void checkCollisionTankWithStage(Tank *tank, Uint32 dt);
     void checkCollisionBulletWithStage(Bullet *bullet);
     bool checkCollisionBulletWithEagle(Bullet *bullet);
+    // Returns true when a shell of the player or of the ally destroys the
+    // enemy base (the win condition of a Deathmatch stage)
+    bool checkCollisionBulletWithEnemyBase(Bullet *bullet);
     bool checkCollisionWithEagle(Rect &rect);
 
     Point getEagleCenter() const;
+    bool hasEagle() const;
+
+    Point getEnemyBaseCenter() const;
+    bool hasEnemyBase() const;
 private:
     void checkCollisionTankWithEnteringEnv(Tank *tank, Uint32 dt);
     void checkCollisionTankWithLeavingEnv(Tank *tank, Uint32 dt);
     void loadStage();
+    void createEnemyBase();
     void changeEagleSurroundingsToStoneWalls();
     void changeEagleSurroundingsToBrickWalls();
 
     int m_loaded_stage;
+    int m_stage_number;
+    bool m_generated;
+    bool m_survival;
+    bool m_deathmatch;
 
     std::vector<std::vector<Object *>> m_tile_objects;
 
@@ -43,6 +55,10 @@ private:
     Eagle *m_eagle;
     bool m_eagle_protected;
     Uint32 m_eagle_protection_time;
+
+    // Deathmatch: the enemy base, a mirror of our eagle at the top edge
+    Rect m_enemy_eagle_tile_rect;
+    Eagle *m_enemy_eagle;
 
 
     Rect m_map_outside_colision_top_rect;

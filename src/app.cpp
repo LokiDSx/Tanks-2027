@@ -1,8 +1,9 @@
 #include "app.h"
 #include "appconfig.h"
+#include "profile.h"
 #include "engine/engine.h"
 #include "engine/sdl/sdl_engine.h"
-#include "app_state/menu.h"
+#include "app_state/profile_select.h"
 
 #include <ctime>
 #include <iostream>
@@ -25,10 +26,13 @@ App::~App()
 
 void App::run()
 {
+    // Read the profile list; on the very first launch the data saved by
+    // older builds is kept in memory to be seeded into the first profile
+    Profile::init();
 
     SDLEngine sdl_engine;
 
-    sdl_engine.setConfig({"Tanks", Size{AppConfig::windows_rect.w, AppConfig::windows_rect.h}});
+    sdl_engine.setConfig({"Tanks 2027", Size{AppConfig::windows_rect.w, AppConfig::windows_rect.h}});
 
     Engine &engine = sdl_engine;
 
@@ -47,7 +51,12 @@ ProcessingResult App::onEngineInit(const Engine &engine)
 {
     InteractiveComponents components = engine.getInteractiveComponents();
 
-    m_app_state_machine->setState(new Menu(components, m_app_state_machine));
+    // No profile is active yet at startup, so apply the plain defaults
+    // until the player opens a profile on the selection screen
+    components.sound_manager->setMuted(!AppConfig::sound_enabled);
+
+    // Ask which profile to open (or to create the first one)
+    m_app_state_machine->setState(new ProfileSelect(components, m_app_state_machine));
 
     return ProcessingResult::CONTINUE;
 }

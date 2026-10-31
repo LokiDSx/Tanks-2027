@@ -12,6 +12,7 @@ Object::Object(double x, double y, SpriteType type)
     m_sprite = &SpriteConfig::getInstance().getSpriteData(type);
     m_frame_display_time = 0;
     m_current_frame = 0;
+    m_tint = {255, 255, 255, 255};
 
     src_rect.x = m_sprite->rect.x;
     src_rect.y = m_sprite->rect.y;
@@ -36,7 +37,11 @@ Object::~Object()
 void Object::draw(Renderer &renderer)
 {
     if(m_sprite == nullptr || to_erase) return;
-    renderer.drawObject(src_rect, dest_rect);
+    // A white tint means the original sprite colors
+    if (m_tint.r == 255 && m_tint.g == 255 && m_tint.b == 255 && m_tint.a == 255)
+        renderer.drawObject(src_rect, dest_rect);
+    else
+        renderer.drawObject(src_rect, dest_rect, m_tint);
 }
 
 void Object::update(Uint32 dt)

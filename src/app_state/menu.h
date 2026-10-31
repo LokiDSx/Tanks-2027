@@ -9,7 +9,9 @@
 
 /**
  * @brief
- * A state for selecting the game mode: 1 player or 2 players mode or to exit.
+ * A state for selecting the game mode: classic stages, procedurally
+ * generated stages, endless survival without a base, deathmatch against
+ * an enemy base with a friendly tank, application settings, or to exit.
  * This state is the first state of the application, appearing immediately after program startup and allowing transition to the game state.
  */
 class Menu : public AppState

@@ -26,10 +26,22 @@ public:
     virtual void drawObject(const Rect &texture_src, const Rect &window_dest) = 0;
 
     /**
+     * Draw an object from the texture with a color tint (white = no tint).
+     * Used by the Deathmatch to mark enemy roles: red tanks hunt the
+     * player, blue tanks storm the player's base.
+     */
+    virtual void drawObject(const Rect &texture_src, const Rect &window_dest, const Color &tint) = 0;
+
+    /**
      * Draw text at the specified position in the screen buffer.
      * @param start - start location of drawing text. If some coordinate is negative; text will be drawn at the center of axis with negative value
      */
     virtual void drawText(const Point &start, std::string text, Color text_color, FontSize font_size) = 0;
+
+    /**
+     * Measure the pixel size of the text as drawText would render it.
+     */
+    virtual Size measureText(const std::string &text, FontSize font_size) = 0;
 
     /**
      * Draw a rectangle at the specified position in the screen buffer.

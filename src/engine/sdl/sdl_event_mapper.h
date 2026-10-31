@@ -308,6 +308,8 @@ Event *mapSDLEventToEngineEvent(const SDL_Event &sdl_event)
         return mapSDLEventToKeyboardEvent(sdl_event, KeyboardEvent::RELEASED);
     case SDL_WINDOWEVENT:
         return mapSDLEventToWindowEvent(sdl_event);
+    case SDL_TEXTINPUT:
+        return new TextInputEvent(sdl_event.text.text);
     case SDL_QUIT:
         return new QuitEvent();
     default:

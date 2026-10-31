@@ -30,6 +30,10 @@ protected:
     const SpriteData* m_sprite;
     Uint32 m_frame_display_time;
     int m_current_frame;
+    // Sprite tint (white = the original colors). The Deathmatch uses it to
+    // mark the enemy roles: red tanks hunt the player, blue tanks storm
+    // the player's base.
+    Color m_tint;
 };
 
 #endif // OBJECT_H

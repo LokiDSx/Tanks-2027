@@ -1,20 +1,30 @@
 #include "stage_environment.h"
 #include "../../appconfig.h"
 #include "../../soundconfig.h"
+#include "../../stage_generator.h"
 #include "../../objects/brick.h"
 #include "../../objects/tank/player/player.h"
+#include "../../objects/tank/enemy/enemy.h"
 
 #include <fstream>
 #include <stdexcept>
 
-StageEnvironment::StageEnvironment(int current_stage, InteractiveComponents interactive_components)
-    : InteractiveComponentsHolder(interactive_components)
+StageEnvironment::StageEnvironment(int current_stage, InteractiveComponents interactive_components, bool generated, bool survival, bool deathmatch)
+    : InteractiveComponentsHolder(interactive_components),
+      m_stage_number(current_stage),
+      m_generated(generated),
+      m_survival(survival),
+      m_deathmatch(deathmatch)
 {
 
     m_loaded_stage = (current_stage - 1) % AppConfig::stages_count + 1;
     m_eagle_protected = false;
     m_eagle_protection_time = 0;
     m_eagle_tile_rect = {AppConfig::map_size.w / 2 - 1, AppConfig::map_size.h - 2, 2, 2};
+
+    // Deathmatch enemy base: a mirror of our eagle at the very top edge
+    m_enemy_eagle_tile_rect = {AppConfig::map_size.w / 2 - 1, 0, 2, 2};
+    m_enemy_eagle = nullptr;
 
     m_map_outside_colision_left_rect = {-AppConfig::tile_size.w, -AppConfig::tile_size.h, AppConfig::tile_size.w, AppConfig::map_rect.h + 2 * AppConfig::tile_size.h};
     m_map_outside_colision_right_rect = {AppConfig::map_rect.w, -AppConfig::tile_size.h, AppConfig::tile_size.w, AppConfig::map_rect.h + 2 * AppConfig::tile_size.h};
@@ -40,6 +50,10 @@ StageEnvironment::~StageEnvironment()
     if (m_eagle != nullptr)
         delete m_eagle;
     m_eagle = nullptr;
+
+    if (m_enemy_eagle != nullptr)
+        delete m_enemy_eagle;
+    m_enemy_eagle = nullptr;
 }
 
 void StageEnvironment::drawFirstLayer(Renderer &renderer)
@@ -67,6 +81,9 @@ void StageEnvironment::drawSecondLayer(Renderer &renderer)
 
     if (m_eagle != nullptr)
         m_eagle->draw(renderer);
+
+    if (m_enemy_eagle != nullptr)
+        m_enemy_eagle->draw(renderer);
 }
 
 void StageEnvironment::update(Uint32 dt)
@@ -82,6 +99,9 @@ void StageEnvironment::update(Uint32 dt)
 
     if (m_eagle != nullptr)
         m_eagle->update(dt);
+
+    if (m_enemy_eagle != nullptr)
+        m_enemy_eagle->update(dt);
 
     if (m_eagle_protected)
     {
@@ -120,6 +140,9 @@ void StageEnvironment::destroyEagle()
 
 void StageEnvironment::startEagleProtection()
 {
+    if (m_eagle == nullptr)
+        return;
+
     m_eagle_protected = true;
     m_eagle_protection_time = 0;
 
@@ -137,9 +160,19 @@ void StageEnvironment::checkCollisionTankWithStage(Tank *tank, Uint32 dt)
     Rect intersect_rect;
     Rect pr = tank->nextCollisionRect(dt);
 
-    intersect_rect = m_eagle->collision_rect.intersection(pr);
-    if (intersect_rect.isNotEmpty())
-        tank->collide(intersect_rect);
+    if (m_eagle != nullptr)
+    {
+        intersect_rect = m_eagle->collision_rect.intersection(pr);
+        if (intersect_rect.isNotEmpty())
+            tank->collide(intersect_rect);
+    }
+
+    if (m_enemy_eagle != nullptr)
+    {
+        intersect_rect = m_enemy_eagle->collision_rect.intersection(pr);
+        if (intersect_rect.isNotEmpty())
+            tank->collide(intersect_rect);
+    }
 
     intersect_rect = m_map_outside_colision_top_rect.intersection(pr);
     if (intersect_rect.isNotEmpty())
@@ -166,6 +199,9 @@ void StageEnvironment::checkCollisionBulletWithStage(Bullet *bullet)
         return;
 
     bool is_player_bullet = (dynamic_cast<Player *>(bullet->owner()) != nullptr);
+    Enemy *bullet_owner_enemy = dynamic_cast<Enemy *>(bullet->owner());
+    // The ally's shells are punching, but they cannot break stone walls
+    const bool is_friendly_bullet = (bullet_owner_enemy != nullptr && bullet_owner_enemy->friendly());
     int row_start, row_end;
     int column_start, column_end;
 
@@ -222,7 +258,7 @@ void StageEnvironment::checkCollisionBulletWithStage(Bullet *bullet)
 
             if (intersect_rect.isNotEmpty())
             {
-                if (bullet->isDamageIncreased())
+                if (bullet->isDamageIncreased() && !(is_friendly_bullet && o->type == ST_STONE_WALL))
                 {
                     delete o;
                     m_tile_objects.at(i).at(j) = nullptr;
@@ -231,7 +267,7 @@ void StageEnvironment::checkCollisionBulletWithStage(Bullet *bullet)
                 {
                     Brick *brick = dynamic_cast<Brick *>(o);
                     brick->bulletHit(bullet->direction());
-                    if (is_player_bullet)
+                    if (is_player_bullet || is_friendly_bullet)
                             playSound(SoundConfig::BULLET_HIT_BRICK);
                     if (brick->to_erase)
                     {
@@ -242,7 +278,7 @@ void StageEnvironment::checkCollisionBulletWithStage(Bullet *bullet)
                 else if (o->type == ST_STONE_WALL)
                 {
                     // stone wall - do nothing, just play sound
-                    if (is_player_bullet)
+                    if (is_player_bullet || is_friendly_bullet)
                         playSound(SoundConfig::BULLET_HIT_STONE);
                 }
                 // Do not stop bullet on bush, it allows to destroy all of bushes on the bullet way,
@@ -274,12 +310,53 @@ bool StageEnvironment::checkCollisionBulletWithEagle(Bullet *bullet)
         return false;
     if (bullet->isColide())
         return false;
+    if (m_eagle == nullptr)
+        return false;
 
     Rect intersect_rect = m_eagle->collision_rect.intersection(bullet->collision_rect);
     if (intersect_rect.isNotEmpty())
     {
         bullet->destroy();
+
+        // Deathmatch: the ally's shells can never destroy our own eagle
+        Enemy *bullet_owner_enemy = dynamic_cast<Enemy *>(bullet->owner());
+        if (bullet_owner_enemy != nullptr && bullet_owner_enemy->friendly())
+            return false;
+
         m_eagle->destroy();
+        playSound(SoundConfig::EAGLE_DESTROYED);
+        return true;
+    }
+    return false;
+}
+
+bool StageEnvironment::checkCollisionBulletWithEnemyBase(Bullet *bullet)
+{
+    if (bullet == nullptr)
+        return false;
+    if (bullet->isColide())
+        return false;
+    if (m_enemy_eagle == nullptr)
+        return false;
+
+    Rect intersect_rect = m_enemy_eagle->collision_rect.intersection(bullet->collision_rect);
+    if (intersect_rect.isNotEmpty())
+    {
+        bullet->destroy();
+
+        // The base is already a wreck — nothing left to destroy
+        if (m_enemy_eagle->type != ST_EAGLE)
+            return false;
+
+        // Only the player and the ally may destroy the base;
+        // enemy shells just die against their own defenses
+        Enemy *bullet_owner_enemy = dynamic_cast<Enemy *>(bullet->owner());
+        const bool friendly_fire = (bullet_owner_enemy != nullptr && bullet_owner_enemy->friendly());
+        const bool player_fire = (dynamic_cast<Player *>(bullet->owner()) != nullptr);
+        if (!friendly_fire && !player_fire)
+            return false;
+
+        m_enemy_eagle->destroy();
         playSound(SoundConfig::EAGLE_DESTROYED);
         return true;
     }
@@ -288,13 +365,40 @@ bool StageEnvironment::checkCollisionBulletWithEagle(Bullet *bullet)
 
 bool StageEnvironment::checkCollisionWithEagle(Rect &rect)
 {
-    Rect intersect_rect = m_eagle->collision_rect.intersection(rect);
-    return intersect_rect.isNotEmpty();
+    if (m_eagle != nullptr)
+    {
+        Rect intersect_rect = m_eagle->collision_rect.intersection(rect);
+        if (intersect_rect.isNotEmpty())
+            return true;
+    }
+
+    if (m_enemy_eagle != nullptr)
+    {
+        Rect intersect_rect = m_enemy_eagle->collision_rect.intersection(rect);
+        if (intersect_rect.isNotEmpty())
+            return true;
+    }
+    return false;
 }
 
 Point StageEnvironment::getEagleCenter() const
 {
     return {m_eagle->pos_x + (int)(m_eagle->dest_rect.w / 2), m_eagle->pos_y + (int)(m_eagle->dest_rect.h / 2)};
+}
+
+bool StageEnvironment::hasEagle() const
+{
+    return m_eagle != nullptr;
+}
+
+Point StageEnvironment::getEnemyBaseCenter() const
+{
+    return {m_enemy_eagle->pos_x + (int)(m_enemy_eagle->dest_rect.w / 2), m_enemy_eagle->pos_y + (int)(m_enemy_eagle->dest_rect.h / 2)};
+}
+
+bool StageEnvironment::hasEnemyBase() const
+{
+    return m_enemy_eagle != nullptr && m_enemy_eagle->type == ST_EAGLE;
 }
 
 void StageEnvironment::checkCollisionTankWithEnteringEnv(Tank *tank, Uint32 dt)
@@ -464,27 +568,47 @@ void StageEnvironment::checkCollisionTankWithLeavingEnv(Tank *tank, Uint32 dt)
 
 void StageEnvironment::loadStage()
 {
-    std::ifstream stage_file;
-    std::string stage_file_name = AppConfig::stages_path + std::to_string(m_loaded_stage);
-    stage_file.open(stage_file_name);
-    if (!stage_file.is_open())
+    std::vector<std::string> lines;
+
+    if (m_generated)
     {
-        throw std::runtime_error("Cannot open stage file: " + stage_file_name);
+        // Survival: no eagle nest, no water and no stone blocks.
+        // Deathmatch: our eagle is here, but the map itself is survival-like
+        // (water and stone are replaced by the fortified enemy base).
+        const bool with_eagle = !m_survival;
+        const bool with_water_stone = !m_survival && !m_deathmatch;
+        lines = StageGenerator::generate(m_stage_number, with_eagle, with_water_stone);
+    }
+    else
+    {
+        std::ifstream stage_file;
+        std::string stage_file_name = AppConfig::stages_path + std::to_string(m_loaded_stage);
+        stage_file.open(stage_file_name);
+        if (!stage_file.is_open())
+        {
+            throw std::runtime_error("Cannot open stage file: " + stage_file_name);
+        }
+
+        std::string line;
+        while (std::getline(stage_file, line))
+        {
+            lines.push_back(line);
+        }
+        stage_file.close();
     }
 
     m_tile_objects.clear();
 
-    std::string line;
     size_t row_index = 0;
 
-    while (!stage_file.eof())
+    for (const std::string &line : lines)
     {
-        std::getline(stage_file, line);
         std::vector<Object *> row;
         for (size_t col_index = 0; col_index < line.length() && col_index < (size_t)AppConfig::map_size.w; col_index++)
         {
-            // Skip eagle area
-            if (col_index >= (size_t)m_eagle_tile_rect.x && col_index < (size_t)m_eagle_tile_rect.x + (size_t)m_eagle_tile_rect.w &&
+            // Skip eagle area (there is none in survival mode)
+            if (!m_survival &&
+                col_index >= (size_t)m_eagle_tile_rect.x && col_index < (size_t)m_eagle_tile_rect.x + (size_t)m_eagle_tile_rect.w &&
                 row_index >= (size_t)m_eagle_tile_rect.y && row_index < (size_t)m_eagle_tile_rect.y + (size_t)m_eagle_tile_rect.h)
             {
                 row.push_back(nullptr);
@@ -521,9 +645,62 @@ void StageEnvironment::loadStage()
             break;
     }
 
-    stage_file.close();
+    if (m_survival)
+        m_eagle = nullptr;
+    else
+        m_eagle = new Eagle(m_eagle_tile_rect.x * AppConfig::tile_size.w, m_eagle_tile_rect.y * AppConfig::tile_size.h);
 
-    m_eagle = new Eagle(m_eagle_tile_rect.x * AppConfig::tile_size.w, m_eagle_tile_rect.y * AppConfig::tile_size.h);
+    if (m_deathmatch)
+        createEnemyBase();
+}
+
+void StageEnvironment::createEnemyBase()
+{
+    // The enemy base mirrors our eagle at the top edge (columns 11-14):
+    //   row 0: metal  E E  metal
+    //   row 1: brick  E E  brick
+    //   row 2: brick  brick brick brick
+    const int x = m_enemy_eagle_tile_rect.x;
+    const int y = m_enemy_eagle_tile_rect.y;
+    const int ts_w = AppConfig::tile_size.w;
+    const int ts_h = AppConfig::tile_size.h;
+
+    auto setTile = [&](int col, int row, Object *obj)
+    {
+        if (col < 0 || col >= AppConfig::map_size.w || row < 0 || row >= AppConfig::map_size.h)
+        {
+            delete obj;
+            return;
+        }
+        Object *&cell = m_tile_objects.at(row).at(col);
+        if (cell != nullptr)
+            delete cell;
+        cell = obj;
+    };
+
+    // The nest itself (the base occupies the two topmost cells)
+    m_enemy_eagle = new Eagle(x * ts_w, y * ts_h, true);
+
+    // Brick on the top and at the sides, metal at the bottom: the base
+    // cannot be shot straight through from below
+    setTile(x - 1, y,     new Brick((x - 1) * ts_w, y * ts_h));
+    setTile(x + 2, y,     new Brick((x + 2) * ts_w, y * ts_h));
+    setTile(x - 1, y + 1, new Brick((x - 1) * ts_w, (y + 1) * ts_h));
+    setTile(x + 2, y + 1, new Brick((x + 2) * ts_w, (y + 1) * ts_h));
+    for (int col = x - 1; col <= x + 2; col++)
+        setTile(col, y + 2, new Object(col * ts_w, (y + 2) * ts_h, ST_STONE_WALL));
+
+    // Clear the spawn corridor right below the base so enemies can roll out
+    for (int row = y + 3; row <= y + 4; row++)
+        for (int col = x - 1; col <= x + 2; col++)
+        {
+            Object *&cell = m_tile_objects.at(row).at(col);
+            if (cell != nullptr)
+            {
+                delete cell;
+                cell = nullptr;
+            }
+        }
 }
 
 void StageEnvironment::changeEagleSurroundingsToStoneWalls()

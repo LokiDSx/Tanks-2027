@@ -6,7 +6,9 @@
 class Enemy : public Tank
 {
 public:
-    Enemy(double x, double y, SpriteType type, unsigned armor_count, InteractiveComponents interactive_components);
+    // friendly = true builds the Deathmatch ally: ST_PLAYER_2 sprite and
+    // strong (but not maximum) stats, its goal is to hunt enemy tanks
+    Enemy(double x, double y, SpriteType type, unsigned armor_count, InteractiveComponents interactive_components, bool friendly = false);
     ~Enemy();
 
     void draw(Renderer &renderer) override;
@@ -20,6 +22,21 @@ public:
     void makeWithBonus();
     bool bonus() const;
 
+    // Deathmatch hunter: every third enemy spawns with the ally's logic —
+    // it relentlessly chases the player and fires with aimed shots
+    void makeHunter();
+    bool hunter() const;
+
+    // Deathmatch base killer: storms the player's base (the eagle) with
+    // aimed shots; spawns with the weakest stats on Hard
+    void makeBaseKiller();
+    bool baseKiller() const;
+
+    // The strongest speed available to a tank of this class
+    void makeMaxStats();
+
+    bool friendly() const;
+
     Point target_position;
 
 private:
@@ -29,6 +46,11 @@ private:
     StateMachine *m_enemy_state_machine;
 
     bool m_bonus;
+    bool m_friendly;
+    // Deathmatch hunter: the ally's brain, but out for the player
+    bool m_hunter;
+    // Deathmatch base killer: out for the player's eagle
+    bool m_base_killer;
 
     Uint32 m_direction_time;
     Uint32 m_keep_direction_time;

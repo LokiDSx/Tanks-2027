@@ -1,12 +1,24 @@
 #include "sdl_engine.h"
 #include "sdl_event_mapper.h"
 
+#ifdef VITA_PORT
+#include "vita_input.h"
+#endif
+
 #include <random>
 #include <stdlib.h>
+#include <ctime>
+#include <vector>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <iostream>
+
+#ifdef VITA_PORT
+// Native PS Vita display resolution
+static const int VITA_DISPLAY_WIDTH = 960;
+static const int VITA_DISPLAY_HEIGHT = 544;
+#endif
 
 SDLEngine::~SDLEngine()
 {
@@ -38,14 +50,36 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
 {
     is_main_loop_running = true;
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == 0)
+    Uint32 init_flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
+#ifdef VITA_PORT
+    init_flags |= SDL_INIT_JOYSTICK;
+#endif
+
+    if (SDL_Init(init_flags) == 0)
     {
 
-        std::random_device dev;
-        srand(dev());
+        unsigned int seed;
+        try
+        {
+            std::random_device dev;
+            seed = dev();
+        }
+        catch (...)
+        {
+            // std::random_device is not reliable on every platform (e.g. PS Vita)
+            seed = static_cast<unsigned int>(time(nullptr));
+        }
+        srand(seed);
 
+#ifdef VITA_PORT
+        // The game renders its native 464x416 viewport scaled to the whole
+        // display with aspect-ratio-corrected black bars (see SDLRenderer).
+        m_window = SDL_CreateWindow(m_config.window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                                    VITA_DISPLAY_WIDTH, VITA_DISPLAY_HEIGHT, SDL_WINDOW_SHOWN);
+#else
         m_window = SDL_CreateWindow(m_config.window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                     m_config.initial_window_size.w, m_config.initial_window_size.h, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+#endif
 
         if (m_window == nullptr)
         {
@@ -53,6 +87,11 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
         }
 
         initComponents();
+
+#ifdef VITA_PORT
+        m_renderer->setViewportForWindowSize({VITA_DISPLAY_WIDTH, VITA_DISPLAY_HEIGHT});
+        VitaInput::init();
+#endif
 
         if (onEngineInit(*this) == ProcessingResult::STOP)
         {
@@ -116,28 +155,57 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
 
 ProcessingResult SDLEngine::handleEvents(HandleEventFunc handleEvent)
 {
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
+    std::vector<Event *> events;
+
+    SDL_Event sdl_event;
+    while (SDL_PollEvent(&sdl_event))
     {
-        Event *e = mapSDLEventToEngineEvent(event);
-        if (event.type == SDL_QUIT)
+        if (sdl_event.type == SDL_QUIT)
         {
+            for (Event *pending : events)
+                delete pending;
             return ProcessingResult::STOP;
+        }
+
+#ifdef VITA_PORT
+        VitaInput::handleEvent(sdl_event, events);
+#endif
+
+        Event *e = mapSDLEventToEngineEvent(sdl_event);
+        if (e->type() != Event::UNKNOWN)
+        {
+            events.push_back(e);
         }
         else
         {
-            if (handleInternalEvents(*e) == ProcessingResult::STOP)
-            {
-                return ProcessingResult::STOP;
-            }
-            if (handleEvent(*e) == ProcessingResult::STOP)
-            {
-                return ProcessingResult::STOP;
-            }
+            delete e;
+        }
+    }
+
+#ifdef VITA_PORT
+    VitaInput::pollRepeats(events);
+#endif
+
+    for (size_t i = 0; i < events.size(); ++i)
+    {
+        Event *e = events[i];
+
+        ProcessingResult result = handleInternalEvents(*e);
+        if (result == ProcessingResult::CONTINUE)
+        {
+            result = handleEvent(*e);
         }
 
         delete e;
+
+        if (result == ProcessingResult::STOP)
+        {
+            for (size_t j = i + 1; j < events.size(); ++j)
+                delete events[j];
+            return ProcessingResult::STOP;
+        }
     }
+
     return ProcessingResult::CONTINUE;
 }
 

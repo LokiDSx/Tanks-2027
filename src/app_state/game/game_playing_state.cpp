@@ -29,11 +29,11 @@ void Game::PlayingState::eventProcess(const Event &event)
     if (event.type() == Event::KEYBOARD)
     {
         const KeyboardEvent &event_key = static_cast<const KeyboardEvent &>(event);
-        if (event_key.isPressed(KEY_N))
+        if (event_key.isPressed(KEY_N) && !m_context->m_survival)
         {
             transiteTo(new Game::StageEndingState(m_context, true, false));
         }
-        else if (event_key.isPressed(KEY_B))
+        else if (event_key.isPressed(KEY_B) && !m_context->m_survival)
         {
             m_context->m_current_stage -= 2;
             transiteTo(new Game::StageEndingState(m_context, true, false));
@@ -46,10 +46,14 @@ void Game::PlayingState::eventProcess(const Event &event)
         {
             transiteTo(new Game::PauseState(m_context));
         }
+#ifndef VITA_PORT
+        // On PS Vita ESCAPE is mapped to the Circle button, which is too easy
+        // to press by accident; there the level can be left from the pause menu.
         else if (event_key.isPressed(KEY_ESCAPE))
         {
             m_context->transiteTo(new Menu(m_context->m_interactive_components, m_context->m_state_machine));
         }
+#endif
 
         for (auto player : m_context->m_players)
             player->handleKeyboardEvent(event_key);
