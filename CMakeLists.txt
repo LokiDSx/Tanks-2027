@@ -106,9 +106,10 @@ else()
     create_pbp_file(
         TARGET Tanks
         TITLE "Tanks 2027"
-        ICON_PATH NULL
-        BACKGROUND_PATH NULL
-        PREVIEW_PATH NULL
+        VERSION 1.00
+        ICON_PATH "${RESOURCES_DIR}/psp/icon0.png"
+        BACKGROUND_PATH "${RESOURCES_DIR}/psp/background.png"
+        PREVIEW_PATH "${RESOURCES_DIR}/psp/preview.png"
     )
 
     # -------------------------------------------------------------------------

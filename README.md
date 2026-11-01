@@ -86,6 +86,10 @@ folder) into `ms0:/PSP/GAME/TANKS/` on the memory stick, then launch
 > The game loads its assets from `ms0:/PSP/GAME/TANKS/assets/`, so keep the
 > install folder named `TANKS`.
 
+If the console reboots or the game does not start, check **`boot.log`**
+(created next to `EBOOT.PBP`). It records the startup progress and the reason
+of a failure — the most common one being a missing `assets/` folder.
+
 ## Building for PC (original)
 
 The original desktop build via `Makefile` (Linux / Mac / Windows-MinGW) is kept intact — see instructions below.
