@@ -6,6 +6,9 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <unordered_map>
+#ifdef PSP_PORT
+#include <vector>
+#endif
 
 class SDLRenderer : public Renderer
 {
@@ -38,8 +41,23 @@ private:
     SDL_Texture *m_text_texture;
     std::unordered_map<FontSize, TTF_Font *> m_fonts;
     bool m_fullscreen;
+    // Letterbox offset in logical units; nonzero only on the PSP, whose SDL
+    // driver draws at the top-left corner and ignores the viewport position
+    // (see applyViewport), so the centering is applied manually.
+    int m_offset_x = 0;
+    int m_offset_y = 0;
 #ifdef CONSOLE_PORT
     SDL_Rect m_viewport{0, 0, 0, 0};
+#endif
+#ifdef PSP_PORT
+    // The PSP render driver rejects textures larger than 512x512, so the
+    // 1216x512 atlas is sliced into tiles at load time and drawn tile by tile.
+    std::vector<SDL_Texture *> m_tiles;
+    int m_tile_cols = 0;
+    int m_atlas_w = 0;
+    int m_atlas_h = 0;
+
+    void copyViaTiles(const SDL_Rect &src, const SDL_Rect &dst, const Color *tint);
 #endif
 };
 

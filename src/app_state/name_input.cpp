@@ -85,10 +85,12 @@ void NameInput::startKeyboard()
     // Reset the on-screen keyboard cursor
     m_kb_row = 0;
     m_kb_col = 0;
-#endif
+#else
     // Opens the system keyboard on the PS Vita, only enables text events
-    // on desktop systems
+    // on desktop systems. Not called on the PSP: SDL_StartTextInput() there
+    // opens the system OSK dialog on top of our own on-screen keyboard.
     SDL_StartTextInput();
+#endif
 }
 
 void NameInput::draw(Renderer &renderer)
