@@ -20,7 +20,6 @@ SDLRenderer::SDLRenderer(Size viewport_base_size)
 
     m_texture = nullptr;
     m_renderer = nullptr;
-    m_text_texture = nullptr;
 
     m_fullscreen = false;
 }
@@ -31,8 +30,9 @@ SDLRenderer::~SDLRenderer()
         SDL_DestroyRenderer(m_renderer);
     if (m_texture != nullptr)
         SDL_DestroyTexture(m_texture);
-    if (m_text_texture != nullptr)
-        SDL_DestroyTexture(m_text_texture);
+    for (auto &[key, cached] : m_text_cache)
+        if (cached.texture != nullptr)
+            SDL_DestroyTexture(cached.texture);
 #ifdef PSP_PORT
     for (SDL_Texture *tile : m_tiles)
         if (tile != nullptr)
@@ -127,6 +127,28 @@ void SDLRenderer::loadTexture(SDL_Window *window)
 
 void SDLRenderer::clear()
 {
+    // Text cache bookkeeping: drop strings that have not been drawn for a
+    // couple of frames (score animations produce many unique strings).
+    ++m_text_tick;
+    if (m_text_cache.size() > TEXT_CACHE_LIMIT)
+    {
+        for (auto it = m_text_cache.begin(); it != m_text_cache.end();)
+        {
+            if (it->second.last_used_tick + 2 < m_text_tick)
+                it = m_text_cache.erase(it);
+            else
+                ++it;
+        }
+        // All entries are recent (unlikely, but possible): drop the oldest half.
+        if (m_text_cache.size() > TEXT_CACHE_LIMIT)
+        {
+            size_t to_drop = m_text_cache.size() / 2;
+            auto it = m_text_cache.begin();
+            while (to_drop-- > 0 && it != m_text_cache.end())
+                it = m_text_cache.erase(it);
+        }
+    }
+
     if (m_widescreen != AppConfig::widescreen)
     {
         m_widescreen = AppConfig::widescreen;
@@ -339,40 +361,63 @@ void SDLRenderer::drawText(const Point &start, std::string text, Color text_colo
     TTF_Font *font = m_fonts[font_size];
     if (font == nullptr)
         return;
-        
-    if (m_text_texture != nullptr)
-        SDL_DestroyTexture(m_text_texture);
 
-    SDL_Color sdl_text_color = {static_cast<Uint8>(text_color.r), static_cast<Uint8>(text_color.g), static_cast<Uint8>(text_color.b), static_cast<Uint8>(text_color.a)};
-    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text.c_str(), sdl_text_color);
+    TextCacheKey key;
+    key.text = std::move(text);
+    key.r = text_color.r;
+    key.g = text_color.g;
+    key.b = text_color.b;
+    key.a = text_color.a;
+    key.size = static_cast<int>(font_size);
 
-    if (text_surface == nullptr)
-        return;
+    auto it = m_text_cache.find(key);
+    if (it == m_text_cache.end())
+    {
+        SDL_Color sdl_text_color = {static_cast<Uint8>(key.r), static_cast<Uint8>(key.g), static_cast<Uint8>(key.b), static_cast<Uint8>(key.a)};
+        SDL_Surface *text_surface = TTF_RenderText_Solid(font, key.text.c_str(), sdl_text_color);
 
-    m_text_texture = SDL_CreateTextureFromSurface(m_renderer, text_surface);
-    int text_width = text_surface->w;
-    int text_height = text_surface->h;
-    SDL_FreeSurface(text_surface);
-    if (m_text_texture == nullptr)
-        return;
+        if (text_surface == nullptr)
+            return;
+
+        CachedTextTexture cached;
+        cached.texture = SDL_CreateTextureFromSurface(m_renderer, text_surface);
+        cached.width = text_surface->w;
+        cached.height = text_surface->h;
+        SDL_FreeSurface(text_surface);
+        if (cached.texture == nullptr)
+            return;
+
+#ifdef PSP_PORT
+        // The console downscales the 464x416 picture to fit 272 lines of the
+        // PSP screen (~0.65x); nearest filtering drops rows of small glyphs
+        // and made the text look torn. Linear keeps it intact (the driver
+        // switches GU_NEAREST/GU_LINEAR from the texture's scale mode).
+        SDL_SetTextureScaleMode(cached.texture, SDL_ScaleModeLinear);
+#endif
+
+        it = m_text_cache.emplace(std::move(key), std::move(cached)).first;
+    }
+
+    CachedTextTexture &cached = it->second;
+    cached.last_used_tick = m_text_tick;
 
     SDL_Rect window_dest;
     if (start.x < 0)
-        window_dest.x = (m_viewport_base_size.w - text_width) / 2;
+        window_dest.x = (m_viewport_base_size.w - cached.width) / 2;
     else
         window_dest.x = start.x;
 
     if (start.y < 0)
-        window_dest.y = (m_viewport_base_size.h - text_height) / 2;
+        window_dest.y = (m_viewport_base_size.h - cached.height) / 2;
     else
         window_dest.y = start.y;
 
-    window_dest.w = text_width;
-    window_dest.h = text_height;
+    window_dest.w = cached.width;
+    window_dest.h = cached.height;
     window_dest.x += m_offset_x;
     window_dest.y += m_offset_y;
 
-    SDL_RenderCopy(m_renderer, m_text_texture, NULL, &window_dest);
+    SDL_RenderCopy(m_renderer, cached.texture, NULL, &window_dest);
 }
 
 Size SDLRenderer::measureText(const std::string &text, FontSize font_size)

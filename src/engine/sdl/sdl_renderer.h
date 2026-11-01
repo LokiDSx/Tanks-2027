@@ -5,6 +5,8 @@
 #include "../data/font_size.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <map>
+#include <string>
 #include <unordered_map>
 #ifdef PSP_PORT
 #include <vector>
@@ -38,9 +40,44 @@ private:
     bool m_widescreen = true;
     SDL_Renderer *m_renderer;
     SDL_Texture *m_texture;
-    SDL_Texture *m_text_texture;
     std::unordered_map<FontSize, TTF_Font *> m_fonts;
     bool m_fullscreen;
+
+    // Rasterized strings are cached: re-rendering the same text with TTF and
+    // re-uploading a texture every frame is very slow on the PSP (and forces
+    // mid-frame command queue flushes when the single text texture is
+    // destroyed), which made small text shimmer. Key = string + color + size.
+    struct CachedTextTexture
+    {
+        SDL_Texture *texture = nullptr;
+        int width = 0;
+        int height = 0;
+        Uint32 last_used_tick = 0;
+    };
+
+    struct TextCacheKey
+    {
+        std::string text;
+        unsigned int r = 0, g = 0, b = 0, a = 0;
+        int size = 0;
+
+        bool operator<(const TextCacheKey &other) const
+        {
+            if (size != other.size) return size < other.size;
+            if (r != other.r) return r < other.r;
+            if (g != other.g) return g < other.g;
+            if (b != other.b) return b < other.b;
+            if (a != other.a) return a < other.a;
+            return text < other.text;
+        }
+    };
+
+    std::map<TextCacheKey, CachedTextTexture> m_text_cache;
+    Uint32 m_text_tick = 0;
+
+    // Animations like the score count generate many unique strings; evict
+    // entries unused for a couple of frames once the cache outgrows this.
+    static constexpr size_t TEXT_CACHE_LIMIT = 96;
     // Letterbox offset in logical units; nonzero only on the PSP, whose SDL
     // driver draws at the top-left corner and ignores the viewport position
     // (see applyViewport), so the centering is applied manually.
