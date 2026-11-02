@@ -3,6 +3,8 @@
 
 #include "engine/sound_manager.h"
 
+#include <vector>
+
 namespace SoundConfig
 {
     const Sound STAGE_START_UP{"sounds/stage_start_up.ogg", 100.0, 1.0, false, true};
@@ -38,6 +40,36 @@ namespace SoundConfig
     // const Sound SCORE_BONUS_POINTS_RECEIVED {"sounds/score_bonus_points_received.ogg", 100.0, 1.0, true};
 
     const Sound SCORE_POINT_COUNTED{"sounds/score_point_counted.ogg", 80.0, 1.0, true};
+
+    // Every sound the game can play.
+    inline const std::vector<const Sound *> &all()
+    {
+        static const std::vector<const Sound *> sounds = {
+            &STAGE_START_UP, &PAUSE, &GAME_OVER,
+            &BONUS_APPEARED, &BONUS_OBTAINED,
+            &BULLET_HIT_BRICK, &BULLET_HIT_MAP_BOUNDARIES, &BULLET_HIT_STONE, &BULLET_HIT_BULLET,
+            &EAGLE_DESTROYED,
+            &ENEMY_DESTROYED, &ENEMY_HIT,
+            &HIGHSCORE_BEATEN,
+            &MENU_ITEM_SELECTED,
+            &PLAYER_DESTROYED, &PLAYER_FIRED, &PLAYER_HIT, &PLAYER_IDLE, &PLAYER_LIFE_UP,
+            &PLAYER_MOVING, &PLAYER_RESPAWN,
+            &SCORE_POINT_COUNTED};
+        return sounds;
+    }
+
+    // The sound manager reads and decodes a file the first time the sound is
+    // played. On the PSP that means a memory stick access plus an OGG decode
+    // in the middle of the game loop, which shows up as a freeze right when
+    // an action happens (first shot, first hit on a brick, ...). Decoding
+    // everything once at startup keeps the gameplay loop free of file access.
+    inline void preloadAll(SoundManager &sound_manager)
+    {
+        for (const Sound *sound : all())
+        {
+            sound_manager.preload(*sound);
+        }
+    }
 }
 
 #endif

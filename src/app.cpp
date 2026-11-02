@@ -1,6 +1,7 @@
 #include "app.h"
 #include "appconfig.h"
 #include "profile.h"
+#include "soundconfig.h"
 #include "engine/engine.h"
 #include "engine/sdl/sdl_engine.h"
 #include "app_state/profile_select.h"
@@ -54,6 +55,12 @@ ProcessingResult App::onEngineInit(const Engine &engine)
     // No profile is active yet at startup, so apply the plain defaults
     // until the player opens a profile on the selection screen
     components.sound_manager->setMuted(!AppConfig::sound_enabled);
+
+    // Decode all sound effects up front: a lazy load inside the game loop
+    // stalls the PSP while it reads the memory stick (first shot, first
+    // brick hit, ...). This happens while the screen is still black, so a
+    // slightly longer startup is the only visible cost.
+    SoundConfig::preloadAll(*components.sound_manager);
 
     // Ask which profile to open (or to create the first one)
     m_app_state_machine->setState(new ProfileSelect(components, m_app_state_machine));
