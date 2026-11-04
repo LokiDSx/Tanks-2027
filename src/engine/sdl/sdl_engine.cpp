@@ -71,6 +71,16 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
     init_flags |= SDL_INIT_JOYSTICK;
 #endif
 
+#ifdef ANDROID_PORT
+    // SDL registers the phone's accelerometer as joystick #0 by default.
+    // Gravity then reads as a constant stick deflection (the axis aligned
+    // with gravity saturates to ~32767, far above the 12000 threshold):
+    // the tank would drive itself and the on-screen D-pad would show the
+    // direction permanently lit. Real game controllers are enumerated
+    // separately and keep working with this hint off.
+    SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
+#endif
+
     if (SDL_Init(init_flags) == 0)
     {
 
