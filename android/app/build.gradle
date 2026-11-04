@@ -1,0 +1,68 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.lokids.tanks2027'
+    compileSdk 35
+    // Pin the NDK instead of letting AGP download its own default copy.
+    ndkVersion '27.1.12297006'
+
+    defaultConfig {
+        applicationId 'com.lokids.tanks2027'
+        minSdk 21
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+
+        externalNativeBuild {
+            cmake {
+                // The game uses C++17 with exceptions; SDL and the codecs
+                // are built as shared libraries by ../../CMakeLists.txt.
+                arguments '-DANDROID_STL=c++_static'
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            // The shared CMake project lives one level above android/ so
+            // the Vita and PSP builds keep using the very same file.
+            path file('../../CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// Stage the game assets into src/main/assets so the APK layout matches the
+// relative paths in AppConfig (texture.png, kongtext.ttf, stages/, sounds/).
+// The real files stay in ../../resources, this is a build-time copy only.
+tasks.register('syncAssets', Copy) {
+    into layout.projectDirectory.dir('src/main/assets')
+    from('../../resources') {
+        include 'stages/**'
+        include 'sounds/**'
+    }
+    from('../../resources/textures') {
+        include 'texture.png'
+    }
+    from('../../resources/font') {
+        include 'kongtext.ttf'
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn 'syncAssets'
+}

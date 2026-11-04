@@ -5,6 +5,10 @@
 #include "console_input.h"
 #endif
 
+#ifdef ANDROID_PORT
+#include "touch_overlay.h"
+#endif
+
 #include <random>
 #include <stdlib.h>
 #include <ctime>
@@ -87,7 +91,15 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
         // The game renders its native 464x416 viewport scaled to the whole
         // display with aspect-ratio-corrected black bars (see SDLRenderer).
         m_window = SDL_CreateWindow(m_config.window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                    CONSOLE_DISPLAY_WIDTH, CONSOLE_DISPLAY_HEIGHT, SDL_WINDOW_SHOWN);
+                                    CONSOLE_DISPLAY_WIDTH, CONSOLE_DISPLAY_HEIGHT, SDL_WINDOW_SHOWN
+#ifdef ANDROID_PORT
+                                    // Android's screen is much bigger than the console's: desktop
+                                    // fullscreen makes SDL switch the activity into immersive mode
+                                    // (status and navigation bars hidden) instead of leaving the
+                                    // picture in a corner with the system bars visible.
+                                    | SDL_WINDOW_FULLSCREEN_DESKTOP
+#endif
+        );
 #else
         m_window = SDL_CreateWindow(m_config.window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                     m_config.initial_window_size.w, m_config.initial_window_size.h, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
@@ -101,7 +113,19 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
         initComponents();
 
 #ifdef CONSOLE_PORT
+#ifdef ANDROID_PORT
+        // The native surface already has the real screen size by the time the
+        // window is created (Android_CreateWindow copies it), so the viewport
+        // is taken from the window itself. Hardcoding the console's 960x544
+        // here would letterbox the picture into the top-left corner and make
+        // the touch overlay's hit tests (which use SDL_GetWindowSize) disagree
+        // with the coordinates the buttons are drawn at.
+        int win_w = 0, win_h = 0;
+        SDL_GetWindowSize(m_window, &win_w, &win_h);
+        m_renderer->setViewportForWindowSize({win_w, win_h});
+#else
         m_renderer->setViewportForWindowSize({CONSOLE_DISPLAY_WIDTH, CONSOLE_DISPLAY_HEIGHT});
+#endif
         ConsoleInput::init();
 #endif
 
@@ -116,6 +140,25 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
         Uint32 previous_time = current_time;
         while (is_main_loop_running)
         {
+#ifdef ANDROID_PORT
+            // The Android surface can be resized at any moment (immersive mode
+            // engaging, rotation, gesture bar) and the resize event does not
+            // always arrive (the first surfaceChanged happens before the window
+            // exists). Re-check the real window size every frame so the
+            // viewport and the touch overlay (drawn and hit-tested in window
+            // coordinates) stay in sync with the screen.
+            {
+                int win_w = 0, win_h = 0;
+                SDL_GetWindowSize(m_window, &win_w, &win_h);
+                const Size current = m_renderer->windowSize();
+                if (win_w > 0 && win_h > 0 && (win_w != current.w || win_h != current.h))
+                {
+                    SDL_Log("Window size: %dx%d -> %dx%d", current.w, current.h, win_w, win_h);
+                    m_renderer->setViewportForWindowSize({win_w, win_h});
+                }
+            }
+#endif
+
             current_time = SDL_GetTicks();
             Uint32 delta_time = current_time - previous_time;
             previous_time = current_time;
@@ -125,6 +168,18 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
                 is_main_loop_running = false;
                 break;
             }
+
+#ifdef ANDROID_PORT
+            // The app is in the background: keep pumping events (so the
+            // foreground transition is noticed) but freeze the game. The
+            // delta discarded here would otherwise make the game jump by
+            // the whole background time once the player returns.
+            if (m_backgrounded)
+            {
+                SDL_Delay(100);
+                continue;
+            }
+#endif
 
             UpdateState us{delta_time};
 
@@ -179,6 +234,27 @@ ProcessingResult SDLEngine::handleEvents(HandleEventFunc handleEvent)
             return ProcessingResult::STOP;
         }
 
+#ifdef ANDROID_PORT
+        // The OS is tearing the activity down: exit the loop cleanly so the
+        // renderer, audio and window are destroyed in order.
+        if (sdl_event.type == SDL_APP_TERMINATING)
+        {
+            for (Event *pending : events)
+                delete pending;
+            return ProcessingResult::STOP;
+        }
+
+        if (sdl_event.type == SDL_APP_WILLENTERBACKGROUND)
+            m_backgrounded = true;
+        else if (sdl_event.type == SDL_APP_DIDENTERFOREGROUND)
+            m_backgrounded = false;
+
+        int window_w = 0;
+        int window_h = 0;
+        SDL_GetWindowSize(m_window, &window_w, &window_h);
+        TouchOverlay::handleEvent(sdl_event, events, window_w, window_h);
+#endif
+
 #ifdef CONSOLE_PORT
         ConsoleInput::handleEvent(sdl_event, events);
 #endif
@@ -227,6 +303,7 @@ ProcessingResult SDLEngine::handleInternalEvents(const Event &event)
     {
         const WindowEvent &we = static_cast<const WindowEvent &>(event);
         if (we.windowEventType() == WindowEvent::RESIZED ||
+            we.windowEventType() == WindowEvent::SIZE_CHANGED ||
             we.windowEventType() == WindowEvent::MAXIMIZED ||
             we.windowEventType() == WindowEvent::RESTORED ||
             we.windowEventType() == WindowEvent::SHOWN)

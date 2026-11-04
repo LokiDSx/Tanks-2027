@@ -19,6 +19,10 @@ KeyboardEvent *mapSDLEventToKeyboardEvent(const SDL_Event &sdl_event, KeyboardEv
     case SDLK_ESCAPE:
         keycode = KeyCode::KEY_ESCAPE;
         break;
+    case SDLK_AC_BACK:
+        // Android system Back button: behave like ESCAPE (back / quit to menu)
+        keycode = KeyCode::KEY_ESCAPE;
+        break;
     case SDLK_BACKSPACE:
         keycode = KeyCode::KEY_BACKSPACE;
         break;

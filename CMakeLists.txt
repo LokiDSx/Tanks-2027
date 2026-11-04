@@ -5,16 +5,26 @@ if(VITA)
     set(TANKS_CONSOLE "PS Vita")
 elseif(PSP)
     set(TANKS_CONSOLE "PSP")
+elseif(ANDROID)
+    set(TANKS_CONSOLE "Android")
 else()
-    message(FATAL_ERROR "This CMake project builds the PS Vita or PSP port only. Use the Makefile for desktop builds.")
+    message(FATAL_ERROR "This CMake project builds the PS Vita, PSP or Android port only. Use the Makefile for desktop builds.")
 endif()
 
 file(GLOB_RECURSE TANKS_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-add_executable(Tanks ${TANKS_SOURCES})
+if(ANDROID)
+    # SDLActivity.java loads libSDL2.so and libmain.so and starts the game
+    # by calling SDL_main() (src/main.cpp renames main() through SDL.h).
+    add_library(main SHARED ${TANKS_SOURCES})
+    set(TANKS_TARGET main)
+else()
+    add_executable(Tanks ${TANKS_SOURCES})
+    set(TANKS_TARGET Tanks)
+endif()
 
-target_compile_features(Tanks PRIVATE cxx_std_17)
-target_compile_options(Tanks PRIVATE -Wall -Wno-narrowing)
+target_compile_features(${TANKS_TARGET} PRIVATE cxx_std_17)
+target_compile_options(${TANKS_TARGET} PRIVATE -Wall -Wno-narrowing)
 
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 
@@ -80,6 +90,68 @@ if(VITA)
         FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
         FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
     )
+elseif(ANDROID)
+    # -------------------------------------------------------------------------
+    # Android build (APK assembled by the Gradle project in android/)
+    #
+    # SDL2 and the SDL2_* satellite libraries are built from the sources in
+    # android/deps as shared libraries and packaged into the APK by Gradle.
+    # Our code becomes libmain.so, which SDLActivity.java loads right after
+    # libSDL2.so and starts via SDL_main().
+    # -------------------------------------------------------------------------
+    enable_language(C)
+
+    target_compile_definitions(${TANKS_TARGET} PRIVATE ANDROID_PORT CONSOLE_PORT)
+
+    set(TANKS_DEPS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android/deps")
+
+    # SDL2 as libSDL2.so; SDL2main is not needed (SDLActivity resolves
+    # SDL_main in libmain.so directly).
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_SDL2MAIN ON CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    add_subdirectory("${TANKS_DEPS_DIR}/SDL2-2.32.4" sdl2-build)
+
+    # SDL2_image: the PNG atlas loads through the bundled stb decoder, so no
+    # external image codec libraries are required.
+    set(SDL2IMAGE_BACKEND_STB ON CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_AVIF OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_JXL OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_TIFF OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_WEBP OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${TANKS_DEPS_DIR}/SDL2_image-2.8.8" sdl2_image-build)
+
+    # SDL2_ttf: freetype is vendored in external/.
+    set(SDL2TTF_VENDORED ON CACHE BOOL "" FORCE)
+    add_subdirectory("${TANKS_DEPS_DIR}/SDL2_ttf-2.24.0" sdl2_ttf-build)
+
+    # SDL2_mixer: every sound effect is an .ogg file, decoded by the
+    # bundled stb_vorbis; all other codecs are turned off so that none of
+    # them try to locate system libraries.
+    set(SDL2MIXER_VORBIS "STB" CACHE STRING "" FORCE)
+    set(SDL2MIXER_FLAC OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_WAVPACK OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MOD OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MP3 OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MIDI OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_OPUS OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${TANKS_DEPS_DIR}/SDL2_mixer-2.8.1" sdl2_mixer-build)
+
+    # The game includes SDL as <SDL2/SDL.h>, but the SDL sources lay the
+    # headers out without the SDL2/ prefix; android/compat forwards to the
+    # real headers through plain includes (that directory holds no plain
+    # SDL.h, so the forwarders can never include themselves).
+    target_include_directories(${TANKS_TARGET} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/android/compat")
+
+    target_link_libraries(${TANKS_TARGET} PRIVATE
+        SDL2::SDL2
+        SDL2_image::SDL2_image
+        SDL2_ttf::SDL2_ttf
+        SDL2_mixer::SDL2_mixer
+        android
+        log)
 else()
     # -------------------------------------------------------------------------
     # PSP build (EBOOT.PBP)

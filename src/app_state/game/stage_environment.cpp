@@ -6,8 +6,9 @@
 #include "../../objects/tank/player/player.h"
 #include "../../objects/tank/enemy/enemy.h"
 
-#include <fstream>
+#include <sstream>
 #include <stdexcept>
+#include <SDL2/SDL.h>
 
 StageEnvironment::StageEnvironment(int current_stage, InteractiveComponents interactive_components, bool generated, bool survival, bool deathmatch)
     : InteractiveComponentsHolder(interactive_components),
@@ -581,20 +582,32 @@ void StageEnvironment::loadStage()
     }
     else
     {
-        std::ifstream stage_file;
+        // SDL_RWFromFile also reaches into the APK assets on Android, where
+        // plain std::ifstream cannot open files.
         std::string stage_file_name = AppConfig::stages_path + std::to_string(m_loaded_stage);
-        stage_file.open(stage_file_name);
-        if (!stage_file.is_open())
+        SDL_RWops *stage_file = SDL_RWFromFile(stage_file_name.c_str(), "rb");
+        if (stage_file == nullptr)
         {
             throw std::runtime_error("Cannot open stage file: " + stage_file_name);
         }
 
-        std::string line;
-        while (std::getline(stage_file, line))
+        std::string stage_data;
+        char buffer[1024];
+        size_t bytes_read;
+        while ((bytes_read = SDL_RWread(stage_file, buffer, 1, sizeof(buffer))) > 0)
         {
+            stage_data.append(buffer, bytes_read);
+        }
+        SDL_RWclose(stage_file);
+
+        std::istringstream stage_stream(stage_data);
+        std::string line;
+        while (std::getline(stage_stream, line))
+        {
+            if (!line.empty() && line.back() == '\r')
+                line.pop_back();
             lines.push_back(line);
         }
-        stage_file.close();
     }
 
     m_tile_objects.clear();

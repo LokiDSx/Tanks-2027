@@ -11,6 +11,13 @@
 
 #include "app.h"
 
+#ifdef ANDROID_PORT
+// SDLActivity.java starts the game by calling SDL_main() inside libmain.so;
+// SDL_main.h (pulled in by SDL.h) renames main() to SDL_main and marks it
+// for export so dlsym() can find it.
+#include <SDL2/SDL.h>
+#endif
+
 #ifdef PSP_PORT
 #include "appconfig.h"
 

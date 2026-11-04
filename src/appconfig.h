@@ -25,6 +25,11 @@ namespace AppConfig
 #elif defined(PSP_PORT)
     // Assets sit next to EBOOT.PBP in the install folder (default: ms0:/PSP/GAME/TANKS/)
     inline string assets_dir = "ms0:/PSP/GAME/TANKS/assets/";
+#elif defined(ANDROID_PORT)
+    // Assets live at the root of the read-only APK and are opened through
+    // SDL_RW (IMG_Load, TTF_OpenFont, Mix_LoadWAV, SDL_RWFromFile), which
+    // falls back to the APK asset manager for relative paths.
+    inline string assets_dir = "";
 #else
     inline string assets_dir = "";
 #endif

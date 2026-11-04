@@ -6,3 +6,12 @@ build-vita
 build-psp
 third_party
 .DS_Store
+
+# Android/Gradle
+android/.gradle
+android/app/.cxx
+android/app/build
+android/app/src/main/assets
+# Third-party sources fetched for the build (SDL, freetype, tarballs, Gradle)
+android/deps
+local.properties

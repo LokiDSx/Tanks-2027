@@ -31,6 +31,7 @@ public:
     void toggleFullscreen(SDL_Window *window);
     void setViewportForWindowSize(Size window_size);
     void setWidescreen(bool widescreen);
+    Size windowSize() const { return m_window_size; }
 
 private:
     void applyViewport();

@@ -5,6 +5,10 @@
 #include <iostream>
 #include <algorithm>
 
+#ifdef ANDROID_PORT
+#include "touch_overlay.h"
+#endif
+
 SDLRenderer::SDLRenderer(Size viewport_base_size)
     : m_viewport_base_size(viewport_base_size)
 {
@@ -174,6 +178,16 @@ void SDLRenderer::clear()
 
 void SDLRenderer::flush()
 {
+#ifdef ANDROID_PORT
+    // The on-screen controls are drawn in raw window coordinates on top of
+    // the finished frame: the letterbox viewport and scale are reset first
+    // and restored afterwards (the next clear() resets them anyway).
+    if (m_window_size.w > 0 && m_window_size.h > 0)
+    {
+        TouchOverlay::draw(m_renderer, m_window_size.w, m_window_size.h);
+        applyViewport();
+    }
+#endif
     SDL_RenderPresent(m_renderer);
 }
 

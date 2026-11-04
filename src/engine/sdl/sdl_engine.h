@@ -25,6 +25,13 @@ public:
 private:
     bool is_main_loop_running = false;
 
+#ifdef ANDROID_PORT
+    // True while the app is in the background (SDL_APP_WILLENTERBACKGROUND
+    // ... SDL_APP_DIDENTERFOREGROUND): the main loop keeps polling events
+    // but freezes updates and rendering.
+    bool m_backgrounded = false;
+#endif
+
     SDL_Window *m_window;
     SDLRenderer *m_renderer;
     SDLSoundManager *m_sound_manager;
