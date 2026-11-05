@@ -257,7 +257,12 @@ void NameInput::eventProcess(const Event &event)
     }
 #endif
 
-    if (ev.isPressed(KeyCode::KEY_RETURN))
+    if (ev.isPressed(KeyCode::KEY_RETURN)
+#ifdef ANDROID_PORT
+        // FIRE confirms the entered name
+        || ev.isPressed(KeyCode::KEY_SPACE)
+#endif
+    )
     {
         tryConfirm();
     }

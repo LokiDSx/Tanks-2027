@@ -7,11 +7,11 @@
 // into the same synthetic keyboard events that console_input.h generates for
 // the physical gamepad: directions go through ConsoleInput::updateDir (which
 // also provides the key repeat used for menu navigation), FIRE emits both
-// RCTRL and SPACE, PAUSE is RETURN, BACK is ESCAPE and TARGETS is T.
+// RCTRL and SPACE, PAUSE is RETURN and BACK is ESCAPE.
 //
-// Layout (landscape): a D-pad in the bottom-left corner, a vertical stack of
-// round buttons in the bottom-right corner, everything drawn semi-transparent
-// on top of the finished frame by TouchOverlay::draw().
+// Layout (landscape): a big D-pad in the bottom-left corner, a vertical stack
+// of round buttons in the bottom-right corner, everything drawn
+// semi-transparent on top of the finished frame by TouchOverlay::draw().
 
 #include "console_input.h"
 
@@ -32,7 +32,6 @@ namespace TouchOverlay
         EL_FIRE,
         EL_PAUSE,
         EL_BACK,
-        EL_TARGETS,
         EL_COUNT
     };
 
@@ -43,7 +42,7 @@ namespace TouchOverlay
     };
 
     inline std::map<SDL_FingerID, Touch> s_fingers;
-    inline int s_held[EL_COUNT] = {0, 0, 0, 0, 0, 0};
+    inline int s_held[EL_COUNT] = {0, 0, 0, 0, 0};
 
     // SDL_FingerID is Sint64; mouse input (emulator, desktop testing) is
     // tracked as a pseudo-finger with this id.
@@ -56,7 +55,6 @@ namespace TouchOverlay
         SDL_Rect fire{0, 0, 0, 0};
         SDL_Rect pause{0, 0, 0, 0};
         SDL_Rect back{0, 0, 0, 0};
-        SDL_Rect targets{0, 0, 0, 0};
         int fire_radius = 0;
         int small_radius = 0;
     };
@@ -71,7 +69,9 @@ namespace TouchOverlay
         Layout l;
 
         const int margin = h / 22;
-        const int dpad_side = std::min(h * 32 / 100, w * 36 / 100);
+        // Testers asked for a bigger D-pad: ~42% of the screen height (was 32%)
+        // so the thumb rests comfortably on it on a 6"+ phone.
+        const int dpad_side = std::min(h * 42 / 100, w * 40 / 100);
         l.dpad_radius = dpad_side / 2;
         l.dpad_center = {margin + l.dpad_radius, h - margin - l.dpad_radius};
 
@@ -88,9 +88,6 @@ namespace TouchOverlay
 
         cy -= l.small_radius + gap + l.small_radius;
         l.back = circleRect(cx, cy, l.small_radius);
-
-        cy -= l.small_radius + gap + l.small_radius;
-        l.targets = circleRect(cx, cy, l.small_radius);
 
         return l;
     }
@@ -134,8 +131,6 @@ namespace TouchOverlay
             return {EL_PAUSE, -1};
         if (circleContains(l.back.x + l.back.w / 2, l.back.y + l.back.h / 2, l.small_radius, x, y))
             return {EL_BACK, -1};
-        if (circleContains(l.targets.x + l.targets.w / 2, l.targets.y + l.targets.h / 2, l.small_radius, x, y))
-            return {EL_TARGETS, -1};
 
         return {EL_NONE, -1};
     }
@@ -152,9 +147,6 @@ namespace TouchOverlay
             break;
         case EL_BACK:
             ConsoleInput::emitKeyboard(out, KeyCode::KEY_ESCAPE, state);
-            break;
-        case EL_TARGETS:
-            ConsoleInput::emitKeyboard(out, KeyCode::KEY_T, state);
             break;
         default:
             break;
@@ -213,6 +205,11 @@ namespace TouchOverlay
         if (prev.el == el && prev.dir == dir)
             return;
 
+        // Diagnostic: shows what each finger is bound to (logcat only),
+        // makes multitouch problems traceable.
+        SDL_Log("Touch %lld: %d/%d -> %d/%d", static_cast<long long>(id),
+                static_cast<int>(prev.el), prev.dir, static_cast<int>(el), dir);
+
         releaseTouch(out, prev, now);
         Touch next{el, dir};
         pressTouch(out, next, now);
@@ -228,6 +225,8 @@ namespace TouchOverlay
         auto it = s_fingers.find(id);
         if (it == s_fingers.end())
             return;
+        SDL_Log("Touch %lld: release %d/%d", static_cast<long long>(id),
+                static_cast<int>(it->second.el), it->second.dir);
         releaseTouch(out, it->second, now);
         s_fingers.erase(it);
     }
@@ -299,6 +298,17 @@ namespace TouchOverlay
         case SDL_MOUSEBUTTONUP:
         {
             if (window_w <= 0 || window_h <= 0)
+                break;
+
+            // Mouse events synthesized from touch carry SDL_TOUCH_MOUSEID.
+            // Every finger already arrives as its own SDL_Finger* event, so
+            // these duplicates are dropped: the pseudo-mouse record sharing
+            // the finger map with real fingers is what made multitouch
+            // unreliable (a second finger could hijack the D-pad binding).
+            const Uint32 which = (event.type == SDL_MOUSEMOTION)
+                                     ? static_cast<Uint32>(event.motion.which)
+                                     : static_cast<Uint32>(event.button.which);
+            if (which == SDL_TOUCH_MOUSEID)
                 break;
 
             const bool tracked = s_fingers.find(MOUSE_FINGER) != s_fingers.end();
@@ -449,16 +459,6 @@ namespace TouchOverlay
             SDL_Rect head = {cx - shaft_w / 2, cy - head_h / 2, head_w, head_h};
             SDL_RenderFillRect(renderer, &shaft);
             SDL_RenderFillRect(renderer, &head);
-        }
-
-        drawButton(renderer, l.targets, l.small_radius, s_held[EL_TARGETS] > 0, 70, 170, 90);
-        {
-            const int cx = l.targets.x + l.targets.w / 2;
-            const int cy = l.targets.y + l.targets.h / 2;
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 220);
-            fillCircle(renderer, cx, cy, l.small_radius * 55 / 100);
-            SDL_SetRenderDrawColor(renderer, 70, 170, 90, 255);
-            fillCircle(renderer, cx, cy, l.small_radius * 30 / 100);
         }
 
         SDL_SetRenderDrawBlendMode(renderer, prev_blend);

@@ -186,7 +186,12 @@ void Scores::CountingState::eventProcess(const Event &event)
     {
         const KeyboardEvent &ev = static_cast<const KeyboardEvent &>(event);
 
-        if (ev.isPressed(KeyCode::KEY_RETURN))
+        if (ev.isPressed(KeyCode::KEY_RETURN)
+#ifdef ANDROID_PORT
+            // FIRE also skips the score count / continues
+            || ev.isPressed(KeyCode::KEY_SPACE)
+#endif
+        )
         {
             m_context->m_score_counter = m_context->m_max_score;
             transiteTo(new Scores::IdleState(m_context));
@@ -219,7 +224,12 @@ void Scores::IdleState::eventProcess(const Event &event)
     {
         const KeyboardEvent &ev = static_cast<const KeyboardEvent &>(event);
 
-        if (ev.isPressed(KeyCode::KEY_RETURN))
+        if (ev.isPressed(KeyCode::KEY_RETURN)
+#ifdef ANDROID_PORT
+            // FIRE continues from the score screen
+            || ev.isPressed(KeyCode::KEY_SPACE)
+#endif
+        )
         {
             checkHighScoreAndTransite();
         }
@@ -301,7 +311,12 @@ void Scores::HighScoreState::eventProcess(const Event &event)
     {
         const KeyboardEvent &ev = static_cast<const KeyboardEvent &>(event);
 
-        if (ev.isPressed(KeyCode::KEY_RETURN))
+        if (ev.isPressed(KeyCode::KEY_RETURN)
+#ifdef ANDROID_PORT
+            // FIRE skips the hiscore banner
+            || ev.isPressed(KeyCode::KEY_SPACE)
+#endif
+        )
         {
             m_context->transiteToNextState();
         }

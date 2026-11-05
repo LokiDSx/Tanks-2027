@@ -45,8 +45,13 @@ void DeathmatchSetup::draw(Renderer &renderer)
         i++;
     }
 
+#ifdef ANDROID_PORT
+    renderer.drawText({-1, 300}, "LEFT/RIGHT - CHANGE   FIRE - PLAY", {0, 0, 0, 255}, FontSize::NORMAL);
+    renderer.drawText({-1, 320}, "BACK - MENU", {0, 0, 0, 255}, FontSize::NORMAL);
+#else
     renderer.drawText({-1, 300}, "X/LEFT/RIGHT - CHANGE   START - PLAY", {0, 0, 0, 255}, FontSize::NORMAL);
     renderer.drawText({-1, 320}, "O - BACK", {0, 0, 0, 255}, FontSize::NORMAL);
+#endif
 
     renderer.flush();
 }
@@ -89,6 +94,11 @@ void DeathmatchSetup::eventProcess(const Event &event)
     }
     else if (ev.isPressed(KeyCode::KEY_SPACE))
     {
+#ifdef ANDROID_PORT
+        // The FIRE button plays the match (mirrors START on the console);
+        // the on-screen PAUSE button does nothing on this screen.
+        startGame();
+#else
         // X changes the value of the selected row
         if (m_selected_row == 0)
         {
@@ -99,11 +109,16 @@ void DeathmatchSetup::eventProcess(const Event &event)
             m_friend_enabled = !m_friend_enabled;
         }
         playSound(SoundConfig::MENU_ITEM_SELECTED);
+#endif
     }
     else if (ev.isPressed(KeyCode::KEY_RETURN))
     {
-        // Start plays the match with the selected options
+#ifndef ANDROID_PORT
+        // Start plays the match with the selected options. On Android the
+        // PAUSE button (RETURN) must not launch the match - players expect
+        // FIRE to start and PAUSE to be inert here.
         startGame();
+#endif
     }
     else if (ev.isPressed(KeyCode::KEY_ESCAPE))
     {

@@ -79,6 +79,15 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
     // direction permanently lit. Real game controllers are enumerated
     // separately and keep working with this hint off.
     SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
+
+    // Keep touch finger-only: SDL normally synthesizes a mouse "click" for
+    // every finger on top of the SDL_Finger* event. Those pseudo-mouse events
+    // fight with the real finger records in TouchOverlay (the synthetic mouse
+    // can steal the D-pad's pseudo-finger from the second real finger), which
+    // broke multitouch - holding D-pad left the tank unable to fire. Real
+    // mice on the desktop are unaffected, only touch-derived mouse events
+    // are dropped.
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 #endif
 
     if (SDL_Init(init_flags) == 0)
