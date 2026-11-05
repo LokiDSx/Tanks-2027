@@ -290,6 +290,16 @@ ProcessingResult SDLEngine::handleEvents(HandleEventFunc handleEvent)
         int window_w = 0;
         int window_h = 0;
         SDL_GetWindowSize(m_window, &window_w, &window_h);
+        if (window_w <= 0 || window_h <= 0)
+        {
+            // SDL can briefly report a zero-sized window (surface being
+            // recreated, immersive mode toggling). Touch events are dropped
+            // when the size is unknown, so fall back to the last known good
+            // size from the renderer instead of swallowing the press.
+            const Size sz = m_renderer->windowSize();
+            window_w = sz.w;
+            window_h = sz.h;
+        }
         TouchOverlay::handleEvent(sdl_event, events, window_w, window_h);
 #endif
 

@@ -188,6 +188,9 @@ void SDLRenderer::flush()
         // corner of the game picture (drawn in the game viewport, before the
         // overlay resets it to raw window coordinates).
         drawText({4, 4}, std::to_string(static_cast<int>(s_fps + 0.5)), {255, 220, 0, 255}, FontSize::NORMAL);
+        // Second line: touch counters (see TouchOverlay::statLine). Screenshot
+        // of the phone is enough to tell where a tap got lost.
+        drawText({4, 16}, TouchOverlay::statLine(), {0, 220, 255, 255}, FontSize::NORMAL);
 
         TouchOverlay::draw(m_renderer, m_window_size.w, m_window_size.h);
         applyViewport();

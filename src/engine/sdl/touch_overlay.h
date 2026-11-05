@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -43,6 +44,52 @@ namespace TouchOverlay
 
     inline std::map<SDL_FingerID, Touch> s_fingers;
     inline int s_held[EL_COUNT] = {0, 0, 0, 0, 0};
+
+    // Diagnostics shown on screen (see SDLRenderer::flush): they tell from a
+    // screenshot whether a tap never reached the overlay (T does not grow),
+    // was thrown away because the window size was unknown (S), or arrived but
+    // hit nothing (M, L shows what the last press resolved to).
+    inline int s_stat_down = 0;
+    inline int s_stat_skip = 0;
+    inline int s_stat_miss = 0;
+    inline Touch s_stat_last;
+
+    // Fingers whose SDL_FINGERDOWN was dropped because the window size was
+    // not known yet. Their later motion is still processed, so a press held
+    // a moment longer recovers instead of doing nothing at all.
+    inline std::map<SDL_FingerID, bool> s_pending_downs;
+
+    inline const char *hitName(const Touch &t)
+    {
+        if (t.el == EL_DPAD)
+        {
+            static const char *dirs[4] = {"UP", "DOWN", "LEFT", "RIGHT"};
+            return (t.dir >= 0) ? dirs[t.dir] : "CENTRE";
+        }
+        switch (t.el)
+        {
+        case EL_FIRE:
+            return "FIRE";
+        case EL_PAUSE:
+            return "PAUSE";
+        case EL_BACK:
+            return "BACK";
+        default:
+            return "MISS";
+        }
+    }
+
+    // One-line on-screen diagnostics: T = fingers seen, S = presses dropped
+    // for unknown window size, M = presses that hit nothing, L = what the
+    // last press resolved to.
+    inline std::string statLine()
+    {
+        std::string line = "T:" + std::to_string(s_stat_down) +
+                           " S:" + std::to_string(s_stat_skip) +
+                           " M:" + std::to_string(s_stat_miss) +
+                           " L:" + hitName(s_stat_last);
+        return line;
+    }
 
     // SDL_FingerID is Sint64; mouse input (emulator, desktop testing) is
     // tracked as a pseudo-finger with this id.
@@ -272,32 +319,62 @@ namespace TouchOverlay
         case SDL_FINGERMOTION:
         case SDL_FINGERUP:
         {
-            if (window_w <= 0 || window_h <= 0)
-                break;
-
             const SDL_FingerID id = event.tfinger.fingerId;
+
+            if (window_w <= 0 || window_h <= 0)
+            {
+                // Diagnostics: count presses that were thrown away because
+                // the window size was unknown, and remember the finger so a
+                // later motion (or the release) can still be tracked.
+                if (event.type == SDL_FINGERDOWN)
+                {
+                    ++s_stat_skip;
+                    s_pending_downs.emplace(id, true);
+                    SDL_Log("Touch down DROPPED (unknown window size): (%d,%d)",
+                            static_cast<int>(event.tfinger.x * 1000),
+                            static_cast<int>(event.tfinger.y * 1000));
+                }
+                else if (event.type == SDL_FINGERUP)
+                {
+                    s_pending_downs.erase(id);
+                }
+                break;
+            }
+
             const int x = static_cast<int>(event.tfinger.x * window_w);
             const int y = static_cast<int>(event.tfinger.y * window_h);
 
             // Diagnostic: proves that touches arrive and shows the coordinate
             // space they are mapped into (logcat only).
             if (event.type == SDL_FINGERDOWN)
+            {
+                ++s_stat_down;
                 SDL_Log("Touch down: (%d,%d) window %dx%d", x, y, window_w, window_h);
+            }
 
             if (event.type == SDL_FINGERUP)
             {
+                s_pending_downs.erase(id);
                 releaseFinger(out, id, now);
                 break;
             }
 
             // A finger that starts outside every control stays untracked
             // until it is lifted; only an already tracked finger can move
-            // between controls.
-            if (event.type == SDL_FINGERMOTION && s_fingers.find(id) == s_fingers.end())
+            // between controls. Exception: a finger whose down was dropped
+            // (unknown window size) recovers on its first motion.
+            auto pending = s_pending_downs.find(id);
+            if (event.type == SDL_FINGERMOTION && s_fingers.find(id) == s_fingers.end() &&
+                pending == s_pending_downs.end())
                 break;
+            if (pending != s_pending_downs.end())
+                s_pending_downs.erase(pending);
 
             Layout l = computeLayout(window_w, window_h);
             auto hit = hitTestAt(l, window_w, window_h, x, y);
+            s_stat_last = Touch{hit.first, hit.second};
+            if (hit.first == EL_NONE && event.type == SDL_FINGERDOWN)
+                ++s_stat_miss;
             setFinger(out, id, hit.first, hit.second, now);
             break;
         }
