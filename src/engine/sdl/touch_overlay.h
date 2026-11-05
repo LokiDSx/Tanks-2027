@@ -69,11 +69,17 @@ namespace TouchOverlay
         Layout l;
 
         const int margin = h / 22;
-        // Testers asked for a bigger D-pad: ~42% of the screen height (was 32%)
-        // so the thumb rests comfortably on it on a 6"+ phone.
+        // Testers asked for a bigger D-pad: ~42% of the screen height (was 32%).
+        // The disc grows, but its centre stays at the position of the previous,
+        // smaller pad - that is where the thumb lands by habit. Growing the pad
+        // around a centre that shifts up/right moved the arrows past the thumb,
+        // so a press made by muscle memory fell into the middle dead zone and
+        // did nothing until the finger was slid out of it ("sometimes it does
+        // not react at all, sometimes with a delay").
+        const int anchor_side = std::min(h * 32 / 100, w * 36 / 100);
         const int dpad_side = std::min(h * 42 / 100, w * 40 / 100);
         l.dpad_radius = dpad_side / 2;
-        l.dpad_center = {margin + l.dpad_radius, h - margin - l.dpad_radius};
+        l.dpad_center = {margin + anchor_side / 2, h - margin - anchor_side / 2};
 
         l.fire_radius = h * 75 / 1000;
         l.small_radius = h * 55 / 1000;
@@ -116,7 +122,10 @@ namespace TouchOverlay
         const int ddy = y - l.dpad_center.y;
         if (ddx * ddx + ddy * ddy <= l.dpad_radius * l.dpad_radius)
         {
-            const int dead = l.dpad_radius / 4;
+            // Neutral area in the middle of the pad. A sixth of the radius
+            // (was a quarter): with the bigger pad the quarter grew to ~56px
+            // and swallowed presses made at the thumb's usual spot.
+            const int dead = l.dpad_radius / 6;
             if (std::abs(ddx) <= dead && std::abs(ddy) <= dead)
                 return {EL_DPAD, -1};
 

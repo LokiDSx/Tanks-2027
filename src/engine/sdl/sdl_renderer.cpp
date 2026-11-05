@@ -184,6 +184,11 @@ void SDLRenderer::flush()
     // and restored afterwards (the next clear() resets them anyway).
     if (m_window_size.w > 0 && m_window_size.h > 0)
     {
+        // Diagnostics for the testers: frames per second in the top-left
+        // corner of the game picture (drawn in the game viewport, before the
+        // overlay resets it to raw window coordinates).
+        drawText({4, 4}, std::to_string(static_cast<int>(s_fps + 0.5)), {255, 220, 0, 255}, FontSize::NORMAL);
+
         TouchOverlay::draw(m_renderer, m_window_size.w, m_window_size.h);
         applyViewport();
     }
