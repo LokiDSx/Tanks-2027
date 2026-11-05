@@ -48,11 +48,23 @@ namespace TouchOverlay
     // Diagnostics shown on screen (see SDLRenderer::flush): they tell from a
     // screenshot whether a tap never reached the overlay (T does not grow),
     // was thrown away because the window size was unknown (S), or arrived but
-    // hit nothing (M, L shows what the last press resolved to).
+    // hit nothing (M, L shows what the last press resolved to), landed in the
+    // D-pad's neutral centre (C), and where the last press was seen (@x,y
+    // against the window size W). The crosshair drawn by TouchOverlay::draw
+    // at that spot turns a photo of the phone into a coordinate probe.
     inline int s_stat_down = 0;
     inline int s_stat_skip = 0;
     inline int s_stat_miss = 0;
+    inline int s_stat_centre = 0;
     inline Touch s_stat_last;
+    inline int s_last_down_x = 0;
+    inline int s_last_down_y = 0;
+    inline Uint32 s_last_down_tick = 0; // SDL_GetTicks of the last down, 0 = none
+    inline bool s_last_down_hit = false;
+    inline int s_stat_win_w = 0;
+    inline int s_stat_win_h = 0;
+    // Live positions of the fingers currently down (window coordinates).
+    inline std::map<SDL_FingerID, SDL_Point> s_finger_pos;
 
     // Fingers whose SDL_FINGERDOWN was dropped because the window size was
     // not known yet. Their later motion is still processed, so a press held
@@ -80,14 +92,26 @@ namespace TouchOverlay
     }
 
     // One-line on-screen diagnostics: T = fingers seen, S = presses dropped
-    // for unknown window size, M = presses that hit nothing, L = what the
-    // last press resolved to.
+    // for unknown window size, M = presses that hit nothing, C = presses in
+    // the D-pad's neutral centre, L = what the last press resolved to,
+    // @x,y = where the last press landed, W = window size it was mapped to.
     inline std::string statLine()
     {
         std::string line = "T:" + std::to_string(s_stat_down) +
                            " S:" + std::to_string(s_stat_skip) +
                            " M:" + std::to_string(s_stat_miss) +
+                           " C:" + std::to_string(s_stat_centre) +
                            " L:" + hitName(s_stat_last);
+        if (s_last_down_tick != 0)
+        {
+            line += " @" + std::to_string(s_last_down_x) +
+                    "," + std::to_string(s_last_down_y);
+        }
+        if (s_stat_win_w > 0)
+        {
+            line += " W:" + std::to_string(s_stat_win_w) +
+                    "x" + std::to_string(s_stat_win_h);
+        }
         return line;
     }
 
@@ -295,6 +319,7 @@ namespace TouchOverlay
         for (auto &pair : s_fingers)
             releaseTouch(out, pair.second, now);
         s_fingers.clear();
+        s_finger_pos.clear();
 
         for (int dir = 0; dir < 4; ++dir)
             ConsoleInput::updateDir(out, dir, false, ConsoleInput::s_dirs[dir].stick, now);
@@ -337,6 +362,10 @@ namespace TouchOverlay
                 else if (event.type == SDL_FINGERUP)
                 {
                     s_pending_downs.erase(id);
+                    // Release even while the window size is unknown: a finger
+                    // whose up is dropped here would keep its button held
+                    // forever and swallow every later press of that button.
+                    releaseFinger(out, id, now);
                 }
                 break;
             }
@@ -349,12 +378,18 @@ namespace TouchOverlay
             if (event.type == SDL_FINGERDOWN)
             {
                 ++s_stat_down;
+                s_stat_win_w = window_w;
+                s_stat_win_h = window_h;
+                s_last_down_x = x;
+                s_last_down_y = y;
+                s_last_down_tick = now;
                 SDL_Log("Touch down: (%d,%d) window %dx%d", x, y, window_w, window_h);
             }
 
             if (event.type == SDL_FINGERUP)
             {
                 s_pending_downs.erase(id);
+                s_finger_pos.erase(id);
                 releaseFinger(out, id, now);
                 break;
             }
@@ -372,9 +407,20 @@ namespace TouchOverlay
 
             Layout l = computeLayout(window_w, window_h);
             auto hit = hitTestAt(l, window_w, window_h, x, y);
-            s_stat_last = Touch{hit.first, hit.second};
-            if (hit.first == EL_NONE && event.type == SDL_FINGERDOWN)
-                ++s_stat_miss;
+            // Remember where the engine sees the finger (for the on-screen
+            // marker) and, on a fresh press, what it resolved to. Motion must
+            // not overwrite L: the last thing a tester cares about is what
+            // the finger ended up over after sliding off the button.
+            s_finger_pos[id] = {x, y};
+            if (event.type == SDL_FINGERDOWN)
+            {
+                s_stat_last = Touch{hit.first, hit.second};
+                s_last_down_hit = (hit.first != EL_NONE);
+                if (hit.first == EL_NONE)
+                    ++s_stat_miss;
+                else if (hit.first == EL_DPAD && hit.second < 0)
+                    ++s_stat_centre;
+            }
             setFinger(out, id, hit.first, hit.second, now);
             break;
         }
@@ -418,12 +464,29 @@ namespace TouchOverlay
 
             if (event.type == SDL_MOUSEBUTTONUP)
             {
+                s_finger_pos.erase(MOUSE_FINGER);
                 releaseFinger(out, MOUSE_FINGER, now);
                 break;
             }
 
             Layout l = computeLayout(window_w, window_h);
             auto hit = hitTestAt(l, window_w, window_h, x, y);
+            s_finger_pos[MOUSE_FINGER] = {x, y};
+            if (event.type == SDL_MOUSEBUTTONDOWN)
+            {
+                ++s_stat_down;
+                s_stat_win_w = window_w;
+                s_stat_win_h = window_h;
+                s_last_down_x = x;
+                s_last_down_y = y;
+                s_last_down_tick = now;
+                s_stat_last = Touch{hit.first, hit.second};
+                s_last_down_hit = (hit.first != EL_NONE);
+                if (hit.first == EL_NONE)
+                    ++s_stat_miss;
+                else if (hit.first == EL_DPAD && hit.second < 0)
+                    ++s_stat_centre;
+            }
             setFinger(out, MOUSE_FINGER, hit.first, hit.second, now);
             break;
         }
@@ -545,6 +608,42 @@ namespace TouchOverlay
             SDL_Rect head = {cx - shaft_w / 2, cy - head_h / 2, head_w, head_h};
             SDL_RenderFillRect(renderer, &shaft);
             SDL_RenderFillRect(renderer, &head);
+        }
+
+        // --- tester diagnostics --------------------------------------------
+        // Dots under the fingers that are currently down, and a crosshair of
+        // the last press (green = it hit a control, red = it missed) that
+        // lingers for a few seconds. A photo of the phone taken right after
+        // a tap then shows exactly where the game saw it and whether the
+        // press was accepted - no cable or logcat needed.
+        const int dot_r = std::max(6, h / 150);
+        for (const auto &p : s_finger_pos)
+        {
+            SDL_SetRenderDrawColor(renderer, 60, 255, 120, 220);
+            fillCircle(renderer, p.second.x, p.second.y, dot_r);
+        }
+
+        if (s_last_down_tick != 0)
+        {
+            const Uint32 LIFE_MS = 4000;
+            const Uint32 age = SDL_GetTicks() - s_last_down_tick;
+            if (age < LIFE_MS)
+            {
+                Uint8 a = 255;
+                if (age > LIFE_MS - 1000)
+                    a = static_cast<Uint8>(255 * (LIFE_MS - age) / 1000);
+                if (s_last_down_hit)
+                    SDL_SetRenderDrawColor(renderer, 60, 255, 90, a);
+                else
+                    SDL_SetRenderDrawColor(renderer, 255, 60, 60, a);
+
+                const int arms = std::max(16, h / 34);
+                const int cx = s_last_down_x;
+                const int cy = s_last_down_y;
+                SDL_RenderDrawLine(renderer, cx - arms, cy, cx + arms, cy);
+                SDL_RenderDrawLine(renderer, cx, cy - arms, cx, cy + arms);
+                fillCircle(renderer, cx, cy, std::max(6, h / 90));
+            }
         }
 
         SDL_SetRenderDrawBlendMode(renderer, prev_blend);

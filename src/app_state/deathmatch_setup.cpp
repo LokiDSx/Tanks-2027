@@ -84,7 +84,9 @@ void DeathmatchSetup::eventProcess(const Event &event)
     {
         if (m_selected_row == 0)
         {
-            m_difficulty = (m_difficulty + 1) % 3;
+            // Left steps the value down, right steps it up. Both directions
+            // used to advance it, which read as "pressing left moves right".
+            m_difficulty = (m_difficulty + (ev.isPressed(KeyCode::KEY_LEFT) ? 2 : 1)) % 3;
         }
         else
         {
