@@ -213,13 +213,37 @@ namespace TouchOverlay
         const int ddy = y - l.dpad_center.y;
         if (ddx * ddx + ddy * ddy <= l.dpad_radius * l.dpad_radius)
         {
-            // Neutral area in the middle of the pad. A sixth of the radius
-            // (was a quarter): with the bigger pad the quarter grew to ~56px
-            // and swallowed presses made at the thumb's usual spot.
-            const int dead = l.dpad_radius / 6;
-            if (std::abs(ddx) <= dead && std::abs(ddy) <= dead)
+            // The four arrows and the centre are drawn as fixed squares, so a
+            // press on one of them must light exactly that square. Resolving
+            // everything by quadrants (the old behaviour) mapped a press near
+            // a square's corner to the neighbouring direction: the lit arrow
+            // could sit a couple of centimetres from the finger - the tester's
+            // "the button lights up not where I press", which grew with the
+            // bigger pad.
+            const int arm = l.dpad_radius * 62 / 100;
+            const int dist = l.dpad_radius * 55 / 100;
+            const int dirs[4] = {ConsoleInput::DIR_UP, ConsoleInput::DIR_DOWN,
+                                 ConsoleInput::DIR_LEFT, ConsoleInput::DIR_RIGHT};
+            const SDL_Point arms[4] = {
+                {l.dpad_center.x, l.dpad_center.y - dist},
+                {l.dpad_center.x, l.dpad_center.y + dist},
+                {l.dpad_center.x - dist, l.dpad_center.y},
+                {l.dpad_center.x + dist, l.dpad_center.y},
+            };
+            for (int i = 0; i < 4; ++i)
+            {
+                const SDL_Rect arm_rect = {arms[i].x - arm / 2, arms[i].y - arm / 2, arm, arm};
+                if (rectContains(arm_rect, x, y))
+                    return {EL_DPAD, dirs[i]};
+            }
+            const int centre = l.dpad_radius * 40 / 100;
+            const SDL_Rect centre_rect = {l.dpad_center.x - centre / 2,
+                                          l.dpad_center.y - centre / 2, centre, centre};
+            if (rectContains(centre_rect, x, y))
                 return {EL_DPAD, -1};
 
+            // Gaps between the squares: the nearest direction still responds,
+            // so the pad keeps working when the thumb lands between arrows.
             if (std::abs(ddx) > std::abs(ddy))
                 return {EL_DPAD, ddx > 0 ? ConsoleInput::DIR_RIGHT : ConsoleInput::DIR_LEFT};
             return {EL_DPAD, ddy > 0 ? ConsoleInput::DIR_DOWN : ConsoleInput::DIR_UP};
@@ -577,6 +601,51 @@ namespace TouchOverlay
         }
     }
 
+    // A filled arrow pointing in the held direction, drawn at the finger's
+    // contact point. A press in a gap between the arrow squares lights a
+    // square that can be a couple of centimetres away from the thumb, and
+    // the tester reads that as "the button lit up not where I press" - this
+    // arrow makes the direction visible under the finger itself. Sized to
+    // reach past a thumb (the contact patch hides anything smaller).
+    inline void drawDirArrow(SDL_Renderer *r, int cx, int cy, int dir, int size)
+    {
+        SDL_SetRenderDrawColor(r, 255, 240, 90, 235);
+        int tipx = cx, tipy = cy, basex = cx, basey = cy;
+        switch (dir)
+        {
+        case ConsoleInput::DIR_UP:
+            tipy = cy - size;
+            basey = cy + size / 3;
+            break;
+        case ConsoleInput::DIR_DOWN:
+            tipy = cy + size;
+            basey = cy - size / 3;
+            break;
+        case ConsoleInput::DIR_LEFT:
+            tipx = cx - size;
+            basex = cx + size / 3;
+            break;
+        default: // DIR_RIGHT
+            tipx = cx + size;
+            basex = cx - size / 3;
+            break;
+        }
+        const int half = size * 2 / 3;
+        const int steps = std::max(1, size);
+        for (int i = 0; i <= steps; ++i)
+        {
+            const int x = tipx + (basex - tipx) * i / steps;
+            const int y = tipy + (basey - tipy) * i / steps;
+            const int w = half * i / steps;
+            if (w <= 0)
+                SDL_RenderDrawPoint(r, x, y);
+            else if (dir == ConsoleInput::DIR_UP || dir == ConsoleInput::DIR_DOWN)
+                SDL_RenderDrawLine(r, x - w, y, x + w, y);
+            else
+                SDL_RenderDrawLine(r, x, y - w, x, y + w);
+        }
+    }
+
     inline void drawButton(SDL_Renderer *r, const SDL_Rect &rect, int radius, bool held,
                            Uint8 cr, Uint8 cg, Uint8 cb)
     {
@@ -702,6 +771,18 @@ namespace TouchOverlay
             fillCircle(renderer, p.second.x, p.second.y, dot_r);
             drawRing(renderer, p.second.x, p.second.y,
                      std::max(60, h / 5), 6, 255, 255, 0, 230);
+        }
+
+        // Echo the held direction as an arrow right at the contact point,
+        // so the press feedback is visible under the thumb even when the
+        // press lands in a gap between the drawn arrow squares.
+        const int arrow_size = std::max(70, h / 6);
+        for (const auto &p : s_finger_pos)
+        {
+            const auto held = s_fingers.find(p.first);
+            if (held == s_fingers.end() || held->second.el != EL_DPAD || held->second.dir < 0)
+                continue;
+            drawDirArrow(renderer, p.second.x, p.second.y, held->second.dir, arrow_size);
         }
 
         if (s_last_down_tick != 0)
