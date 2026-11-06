@@ -24,6 +24,23 @@ if (-not (Test-Path $gradle)) {
 }
 
 $project = Join-Path $PSScriptRoot "android"
+
+# SDL2 sources are vendored as an extracted (gitignored) tree in android/deps.
+# The touch-coordinates patch must survive any re-extraction from the tarball:
+# apply it whenever the marker comment is missing from SDL_render.c.
+$sdlSrc  = Join-Path $PSScriptRoot "android\deps\SDL2-2.32.4\src\render\SDL_render.c"
+$sdlPat  = Join-Path $PSScriptRoot "android\patches\sdl_render_touch_noop.patch"
+if (Test-Path $sdlSrc) {
+    $sdlText = [IO.File]::ReadAllText($sdlSrc)
+    if (-not $sdlText.Contains("TANKS-2027 PATCH")) {
+        Write-Host "Applying SDL touch-coordinates patch..."
+        git -C $PSScriptRoot apply --check $sdlPat
+        if ($LASTEXITCODE -ne 0) { throw "SDL patch does not apply cleanly" }
+        git -C $PSScriptRoot apply $sdlPat
+        if ($LASTEXITCODE -ne 0) { throw "git apply failed" }
+    }
+}
+
 & $gradle -p $project assembleDebug
 if ($LASTEXITCODE -ne 0) {
     throw "Gradle build failed (exit code $LASTEXITCODE)"

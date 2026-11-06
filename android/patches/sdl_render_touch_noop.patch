@@ -1,0 +1,70 @@
+diff --git a/android/deps/SDL2-2.32.4/src/render/SDL_render.c b/android/deps/SDL2-2.32.4/src/render/SDL_render.c
+index cc3d169..3bdf1c8 100644
+--- a/android/deps/SDL2-2.32.4/src/render/SDL_render.c
++++ b/android/deps/SDL2-2.32.4/src/render/SDL_render.c
+@@ -823,58 +823,13 @@ static int SDLCALL SDL_RendererEventWatch(void *userdata, SDL_Event *event)
+     } else if (event->type == SDL_FINGERDOWN ||
+                event->type == SDL_FINGERUP ||
+                event->type == SDL_FINGERMOTION) {
+-        int logical_w, logical_h;
+-        float physical_w, physical_h;
+-        SDL_DRect viewport;
+-        SDL_FPoint scale;
+-        GetWindowViewportValues(renderer, &logical_w, &logical_h, &viewport, &scale);
+-
+-        /* !!! FIXME: we probably should drop events that are outside of the
+-           !!! FIXME: viewport, but we can't do that from an event watcher,
+-           !!! FIXME: and we would have to track if a touch happened outside
+-           !!! FIXME: the viewport and then slid into it to insert extra
+-           !!! FIXME: events, which is a mess, so for now we just clamp these
+-           !!! FIXME: events to the edge. */
+-
+-        if (renderer->GetOutputSize) {
+-            int w, h;
+-            renderer->GetOutputSize(renderer, &w, &h);
+-            physical_w = (float)w;
+-            physical_h = (float)h;
+-        } else {
+-            int w, h;
+-            SDL_GetWindowSize(renderer->window, &w, &h);
+-            physical_w = ((float)w) * renderer->dpi_scale.x;
+-            physical_h = ((float)h) * renderer->dpi_scale.y;
+-        }
+-
+-        if (physical_w == 0.0f) { /* nowhere for the touch to go, avoid division by zero and put it dead center. */
+-            event->tfinger.x = 0.5f;
+-        } else {
+-            const float normalized_viewport_x = ((float)viewport.x) / physical_w;
+-            const float normalized_viewport_w = ((float)viewport.w) / physical_w;
+-            if (event->tfinger.x <= normalized_viewport_x) {
+-                event->tfinger.x = 0.0f; /* to the left of the viewport, clamp to the edge. */
+-            } else if (event->tfinger.x >= (normalized_viewport_x + normalized_viewport_w)) {
+-                event->tfinger.x = 1.0f; /* to the right of the viewport, clamp to the edge. */
+-            } else {
+-                event->tfinger.x = (event->tfinger.x - normalized_viewport_x) / normalized_viewport_w;
+-            }
+-        }
+-
+-        if (physical_h == 0.0f) { /* nowhere for the touch to go, avoid division by zero and put it dead center. */
+-            event->tfinger.y = 0.5f;
+-        } else {
+-            const float normalized_viewport_y = ((float)viewport.y) / physical_h;
+-            const float normalized_viewport_h = ((float)viewport.h) / physical_h;
+-            if (event->tfinger.y <= normalized_viewport_y) {
+-                event->tfinger.y = 0.0f; /* to the left of the viewport, clamp to the edge. */
+-            } else if (event->tfinger.y >= (normalized_viewport_y + normalized_viewport_h)) {
+-                event->tfinger.y = 1.0f; /* to the right of the viewport, clamp to the edge. */
+-            } else {
+-                event->tfinger.y = (event->tfinger.y - normalized_viewport_y) / normalized_viewport_h;
+-            }
+-        }
++        /* TANKS-2027 PATCH: intentionally a no-op.
++           Upstream SDL maps touch coordinates into the renderer viewport and
++           clamps them to its edges. The game's touch overlay draws in raw
++           window coordinates and reads the viewport itself, so the remap made
++           touches land in the wrong place (and touches over the letterbox
++           margins were clamped to the border, killing the on-screen D-pad).
++           Keep SDL_FINGER* window-normalized. */
+     }
+ 
+     return 0;
