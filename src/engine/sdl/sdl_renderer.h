@@ -33,11 +33,6 @@ public:
     void setWidescreen(bool widescreen);
     Size windowSize() const { return m_window_size; }
 
-    // Frame rate of the main loop. SDLEngine updates it once per probe and
-    // flush() shows it on Android, so a screenshot of the phone is enough to
-    // tell whether input problems coincide with frame drops.
-    static inline double s_fps = 0.0;
-
 private:
     void applyViewport();
 

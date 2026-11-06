@@ -172,7 +172,6 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
                 const Size current = m_renderer->windowSize();
                 if (win_w > 0 && win_h > 0 && (win_w != current.w || win_h != current.h))
                 {
-                    SDL_Log("Window size: %dx%d -> %dx%d", current.w, current.h, win_w, win_h);
                     m_renderer->setViewportForWindowSize({win_w, win_h});
                 }
             }
@@ -228,26 +227,7 @@ void SDLEngine::startMainLoop(OnEngineInitFunc onEngineInit, HandleEventFunc han
                     delay--;
                 probe_time = 0;
                 frames_count = 0;
-
-#ifdef ANDROID_PORT
-                // Diagnostics: one FPS line per second for logcat, and the
-                // value itself is pushed to the renderer for the on-screen
-                // readout (see SDLRenderer::flush).
-                static Uint32 last_fps_log = 0;
-                SDLRenderer::s_fps = fps;
-                if (current_time - last_fps_log >= 1000)
-                {
-                    SDL_Log("FPS: %.1f, frame: %u ms", fps, delta_time);
-                    last_fps_log = current_time;
-                }
-#endif
             }
-#ifdef ANDROID_PORT
-            // A frame this long means a quick tap (press + release) can land in
-            // a single event batch and never be seen by the game's update.
-            if (delta_time > 100)
-                SDL_Log("Slow frame: %u ms", delta_time);
-#endif
         }
 
         destroyComponents();

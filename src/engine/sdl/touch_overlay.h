@@ -20,7 +20,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <map>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -45,95 +44,14 @@ namespace TouchOverlay
     inline std::map<SDL_FingerID, Touch> s_fingers;
     inline int s_held[EL_COUNT] = {0, 0, 0, 0, 0};
 
-    // Diagnostics shown on screen (see SDLRenderer::flush): they tell from a
-    // screenshot whether a tap never reached the overlay (T does not grow),
-    // was thrown away because the window size was unknown (S), or arrived but
-    // hit nothing (M, L shows what the last press resolved to), landed in the
-    // D-pad's neutral centre (C), and where the last press was seen (@x,y
-    // against the window size W). The crosshair drawn by TouchOverlay::draw
-    // at that spot turns a photo of the phone into a coordinate probe.
-    inline int s_stat_down = 0;
-    inline int s_stat_skip = 0;
-    inline int s_stat_miss = 0;
-    inline int s_stat_centre = 0;
-    inline Touch s_stat_last;
-    inline int s_last_down_x = 0;
-    inline int s_last_down_y = 0;
-    inline Uint32 s_last_down_tick = 0; // SDL_GetTicks of the last down, 0 = none
-    inline bool s_last_down_hit = false;
-    inline int s_stat_win_w = 0;
-    inline int s_stat_win_h = 0;
-    // Live positions of the fingers currently down (window coordinates).
+    // Live positions of the fingers currently down (window coordinates),
+    // used to draw the held-direction arrow under the finger.
     inline std::map<SDL_FingerID, SDL_Point> s_finger_pos;
-
-    // Recent press history (capped): every finger-down leaves a small dot -
-    // red where it hit nothing, blue where it hit a control. One screenshot
-    // after natural play shows the MAP of where the tester's taps actually
-    // land, not just the last one.
-    struct Mark
-    {
-        int x = 0;
-        int y = 0;
-        bool hit = false;
-        Uint32 tick = 0;
-    };
-    inline std::vector<Mark> s_marks;
-
-    inline void noteDown(int x, int y, bool hit, Uint32 now)
-    {
-        if (s_marks.size() >= 24)
-            s_marks.erase(s_marks.begin());
-        s_marks.push_back(Mark{x, y, hit, now});
-    }
 
     // Fingers whose SDL_FINGERDOWN was dropped because the window size was
     // not known yet. Their later motion is still processed, so a press held
     // a moment longer recovers instead of doing nothing at all.
     inline std::map<SDL_FingerID, bool> s_pending_downs;
-
-    inline const char *hitName(const Touch &t)
-    {
-        if (t.el == EL_DPAD)
-        {
-            static const char *dirs[4] = {"UP", "DOWN", "LEFT", "RIGHT"};
-            return (t.dir >= 0) ? dirs[t.dir] : "CENTRE";
-        }
-        switch (t.el)
-        {
-        case EL_FIRE:
-            return "FIRE";
-        case EL_PAUSE:
-            return "PAUSE";
-        case EL_BACK:
-            return "BACK";
-        default:
-            return "MISS";
-        }
-    }
-
-    // One-line on-screen diagnostics: T = fingers seen, S = presses dropped
-    // for unknown window size, M = presses that hit nothing, C = presses in
-    // the D-pad's neutral centre, L = what the last press resolved to,
-    // @x,y = where the last press landed, W = window size it was mapped to.
-    inline std::string statLine()
-    {
-        std::string line = "T:" + std::to_string(s_stat_down) +
-                           " S:" + std::to_string(s_stat_skip) +
-                           " M:" + std::to_string(s_stat_miss) +
-                           " C:" + std::to_string(s_stat_centre) +
-                           " L:" + hitName(s_stat_last);
-        if (s_last_down_tick != 0)
-        {
-            line += " @" + std::to_string(s_last_down_x) +
-                    "," + std::to_string(s_last_down_y);
-        }
-        if (s_stat_win_w > 0)
-        {
-            line += " W:" + std::to_string(s_stat_win_w) +
-                    "x" + std::to_string(s_stat_win_h);
-        }
-        return line;
-    }
 
     // SDL_FingerID is Sint64; mouse input (emulator, desktop testing) is
     // tracked as a pseudo-finger with this id.
@@ -329,11 +247,6 @@ namespace TouchOverlay
         if (prev.el == el && prev.dir == dir)
             return;
 
-        // Diagnostic: shows what each finger is bound to (logcat only),
-        // makes multitouch problems traceable.
-        SDL_Log("Touch %lld: %d/%d -> %d/%d", static_cast<long long>(id),
-                static_cast<int>(prev.el), prev.dir, static_cast<int>(el), dir);
-
         releaseTouch(out, prev, now);
         Touch next{el, dir};
         pressTouch(out, next, now);
@@ -349,8 +262,6 @@ namespace TouchOverlay
         auto it = s_fingers.find(id);
         if (it == s_fingers.end())
             return;
-        SDL_Log("Touch %lld: release %d/%d", static_cast<long long>(id),
-                static_cast<int>(it->second.el), it->second.dir);
         releaseTouch(out, it->second, now);
         s_fingers.erase(it);
     }
@@ -392,16 +303,11 @@ namespace TouchOverlay
 
             if (window_w <= 0 || window_h <= 0)
             {
-                // Diagnostics: count presses that were thrown away because
-                // the window size was unknown, and remember the finger so a
-                // later motion (or the release) can still be tracked.
+                // Window size unknown yet: remember the finger so a later
+                // motion (or the release) can still be tracked.
                 if (event.type == SDL_FINGERDOWN)
                 {
-                    ++s_stat_skip;
                     s_pending_downs.emplace(id, true);
-                    SDL_Log("Touch down DROPPED (unknown window size): (%d,%d)",
-                            static_cast<int>(event.tfinger.x * 1000),
-                            static_cast<int>(event.tfinger.y * 1000));
                 }
                 else if (event.type == SDL_FINGERUP)
                 {
@@ -416,19 +322,6 @@ namespace TouchOverlay
 
             const int x = static_cast<int>(event.tfinger.x * window_w);
             const int y = static_cast<int>(event.tfinger.y * window_h);
-
-            // Diagnostic: proves that touches arrive and shows the coordinate
-            // space they are mapped into (logcat only).
-            if (event.type == SDL_FINGERDOWN)
-            {
-                ++s_stat_down;
-                s_stat_win_w = window_w;
-                s_stat_win_h = window_h;
-                s_last_down_x = x;
-                s_last_down_y = y;
-                s_last_down_tick = now;
-                SDL_Log("Touch down: (%d,%d) window %dx%d", x, y, window_w, window_h);
-            }
 
             if (event.type == SDL_FINGERUP)
             {
@@ -462,21 +355,9 @@ namespace TouchOverlay
                 if (held != s_fingers.end() && held->second.el == EL_DPAD && held->second.dir >= 0)
                     hit = {EL_DPAD, held->second.dir};
             }
-            // Remember where the engine sees the finger (for the on-screen
-            // marker) and, on a fresh press, what it resolved to. Motion must
-            // not overwrite L: the last thing a tester cares about is what
-            // the finger ended up over after sliding off the button.
+            // Remember where the engine sees the finger (for the
+            // held-direction arrow drawn under it).
             s_finger_pos[id] = {x, y};
-            if (event.type == SDL_FINGERDOWN)
-            {
-                s_stat_last = Touch{hit.first, hit.second};
-                s_last_down_hit = (hit.first != EL_NONE);
-                if (hit.first == EL_NONE)
-                    ++s_stat_miss;
-                else if (hit.first == EL_DPAD && hit.second < 0)
-                    ++s_stat_centre;
-                noteDown(x, y, hit.first != EL_NONE, now);
-            }
             setFinger(out, id, hit.first, hit.second, now);
             break;
         }
@@ -534,22 +415,6 @@ namespace TouchOverlay
                     hit = {EL_DPAD, held->second.dir};
             }
             s_finger_pos[MOUSE_FINGER] = {x, y};
-            if (event.type == SDL_MOUSEBUTTONDOWN)
-            {
-                ++s_stat_down;
-                s_stat_win_w = window_w;
-                s_stat_win_h = window_h;
-                s_last_down_x = x;
-                s_last_down_y = y;
-                s_last_down_tick = now;
-                s_stat_last = Touch{hit.first, hit.second};
-                s_last_down_hit = (hit.first != EL_NONE);
-                if (hit.first == EL_NONE)
-                    ++s_stat_miss;
-                else if (hit.first == EL_DPAD && hit.second < 0)
-                    ++s_stat_centre;
-                noteDown(x, y, hit.first != EL_NONE, now);
-            }
             setFinger(out, MOUSE_FINGER, hit.first, hit.second, now);
             break;
         }
@@ -578,26 +443,6 @@ namespace TouchOverlay
             const int dx = static_cast<int>(std::sqrt(f) + 0.5f);
             SDL_Rect strip = {cx - dx, cy + dy, dx * 2, 1};
             SDL_RenderFillRect(r, &strip);
-        }
-    }
-
-    // Thick circle outline, used to mark the live position of a finger:
-    // it is drawn wide enough to peek out from under a pressing thumb, where
-    // a small dot would simply be hidden by the finger itself.
-    inline void drawRing(SDL_Renderer *r, int cx, int cy, int radius, int thickness,
-                         Uint8 cr, Uint8 cg, Uint8 cb, Uint8 ca)
-    {
-        SDL_SetRenderDrawColor(r, cr, cg, cb, ca);
-        const int half = std::max(1, thickness / 2);
-        const double PI = 3.14159265358979323846;
-        for (int a = 0; a < 360; a += 3)
-        {
-            const double rad = a * PI / 180.0;
-            const int x1 = cx + static_cast<int>(std::cos(rad) * (radius - half));
-            const int y1 = cy + static_cast<int>(std::sin(rad) * (radius - half));
-            const int x2 = cx + static_cast<int>(std::cos(rad) * (radius + half));
-            const int y2 = cy + static_cast<int>(std::sin(rad) * (radius + half));
-            SDL_RenderDrawLine(r, x1, y1, x2, y2);
         }
     }
 
@@ -738,41 +583,6 @@ namespace TouchOverlay
             SDL_RenderFillRect(renderer, &head);
         }
 
-        // --- tester diagnostics --------------------------------------------
-        // History dots: every recent press leaves a mark - red where it hit
-        // nothing, blue where it hit a control (up to 24, 30 seconds). One
-        // screenshot after natural play shows the whole MAP of taps.
-        for (const auto &m : s_marks)
-        {
-            const Uint32 age = SDL_GetTicks() - m.tick;
-            if (age >= 30000)
-                continue;
-            Uint8 a = 200;
-            if (age > 25000)
-                a = static_cast<Uint8>(200 * (30000 - age) / 5000);
-            if (m.hit)
-                SDL_SetRenderDrawColor(renderer, 80, 140, 255, a);
-            else
-                SDL_SetRenderDrawColor(renderer, 255, 70, 70, a);
-            fillCircle(renderer, m.x, m.y, std::max(5, h / 110));
-        }
-
-        // A thick yellow ring around every finger that is still down (it
-        // peeks out from under the thumb), plus a crosshair of the last
-        // initial contact (green = it hit a control, red = it missed) that
-        // lingers for ten seconds. Press-and-hold, then photograph the screen
-        // with the finger still touching: ring vs finger shows the live
-        // mapping, crosshair vs ring shows how much the contact point drifts
-        // during the press - either way one photo pins down the offset.
-        const int dot_r = std::max(6, h / 150);
-        for (const auto &p : s_finger_pos)
-        {
-            SDL_SetRenderDrawColor(renderer, 60, 255, 120, 220);
-            fillCircle(renderer, p.second.x, p.second.y, dot_r);
-            drawRing(renderer, p.second.x, p.second.y,
-                     std::max(60, h / 5), 6, 255, 255, 0, 230);
-        }
-
         // Echo the held direction as an arrow right at the contact point,
         // so the press feedback is visible under the thumb even when the
         // press lands in a gap between the drawn arrow squares.
@@ -783,29 +593,6 @@ namespace TouchOverlay
             if (held == s_fingers.end() || held->second.el != EL_DPAD || held->second.dir < 0)
                 continue;
             drawDirArrow(renderer, p.second.x, p.second.y, held->second.dir, arrow_size);
-        }
-
-        if (s_last_down_tick != 0)
-        {
-            const Uint32 LIFE_MS = 10000;
-            const Uint32 age = SDL_GetTicks() - s_last_down_tick;
-            if (age < LIFE_MS)
-            {
-                Uint8 a = 255;
-                if (age > LIFE_MS - 2000)
-                    a = static_cast<Uint8>(255 * (LIFE_MS - age) / 2000);
-                if (s_last_down_hit)
-                    SDL_SetRenderDrawColor(renderer, 60, 255, 90, a);
-                else
-                    SDL_SetRenderDrawColor(renderer, 255, 60, 60, a);
-
-                const int arms = std::max(16, h / 34);
-                const int cx = s_last_down_x;
-                const int cy = s_last_down_y;
-                SDL_RenderDrawLine(renderer, cx - arms, cy, cx + arms, cy);
-                SDL_RenderDrawLine(renderer, cx, cy - arms, cx, cy + arms);
-                fillCircle(renderer, cx, cy, std::max(6, h / 90));
-            }
         }
 
         SDL_SetRenderDrawBlendMode(renderer, prev_blend);

@@ -19,7 +19,6 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Toast;
 
 
 /**
@@ -37,10 +36,6 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     // Keep track of the surface size to normalize touch events
     protected float mWidth, mHeight;
-
-    // On-screen diagnostics: first taps print geometry to a Toast (logcat is not
-    // available when testing on a phone without a PC connection).
-    protected int mToastTaps = 0;
 
     // Is SurfaceView ready for rendering
     public boolean mIsSurfaceReady;
@@ -278,23 +273,6 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                         p = 1.0f;
                     }
                     SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
-
-                    // Diagnostics for on-device testing (no logcat): show the
-                    // geometry on the first few taps. "tap" is view-local -
-                    // the exact space SDL and the on-screen crosshair use, so
-                    // tap vs crosshair on one screenshot verifies the whole
-                    // chain. "view@" is the live screen position of the view.
-                    if (action == MotionEvent.ACTION_DOWN && mToastTaps < 10) {
-                        ++mToastTaps;
-                        int[] loc = new int[2];
-                        getLocationOnScreen(loc);
-                        String msg = "surface " + (int) mWidth + "x" + (int) mHeight +
-                                " view@" + loc[0] + "," + loc[1] +
-                                " tap " + Math.round(event.getX(i)) + "," +
-                                Math.round(event.getY(i));
-                        Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-                        Log.v("SDL", "touchDiag: " + msg);
-                    }
                     break;
 
                 case MotionEvent.ACTION_CANCEL:

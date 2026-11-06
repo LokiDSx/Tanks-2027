@@ -192,11 +192,6 @@ namespace ConsoleInput
         {
             s_joystick = SDL_JoystickOpen(0);
         }
-#ifdef ANDROID_PORT
-        // Should be 0 after SDL_HINT_ACCELEROMETER_AS_JOYSTICK=0 unless a
-        // real controller is paired; helps diagnosing phantom input.
-        SDL_Log("Joysticks detected: %d", SDL_NumJoysticks());
-#endif
     }
 
     inline void handleEvent(const SDL_Event &event, std::vector<Event *> &out)
