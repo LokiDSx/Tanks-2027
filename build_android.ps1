@@ -1,8 +1,11 @@
-# Builds the Android port (debug APK) and installs it on a connected device.
+# Builds the Android port (debug APK by default, -Release for the signed
+# store build) and installs it on a connected device.
 #
 # Requires: JDK 17, Android SDK + NDK + CMake (see android/), Gradle 8.10.2.
 # The Gradle project lives in android/, but it drives the very same
 # CMakeLists.txt that the Vita and PSP builds use.
+
+param([switch]$Release)
 
 $ErrorActionPreference = "Stop"
 
@@ -41,12 +44,20 @@ if (Test-Path $sdlSrc) {
     }
 }
 
-& $gradle -p $project assembleDebug
+if ($Release) {
+    $task = "assembleRelease"
+    $apkRel = "app\build\outputs\apk\release\app-release.apk"
+} else {
+    $task = "assembleDebug"
+    $apkRel = "app\build\outputs\apk\debug\app-debug.apk"
+}
+
+& $gradle -p $project $task
 if ($LASTEXITCODE -ne 0) {
     throw "Gradle build failed (exit code $LASTEXITCODE)"
 }
 
-$apk = Join-Path $project "app\build\outputs\apk\debug\app-debug.apk"
+$apk = Join-Path $project $apkRel
 Write-Host ""
 Write-Host "APK: $apk"
 

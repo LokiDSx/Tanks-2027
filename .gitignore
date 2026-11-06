@@ -14,4 +14,6 @@ android/app/build
 android/app/src/main/assets
 # Third-party sources fetched for the build (SDL, freetype, tarballs, Gradle)
 android/deps
+# Release signing (keystore + passwords) - never commit these
+android/keystore
 local.properties
