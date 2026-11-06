@@ -66,6 +66,26 @@ namespace TouchOverlay
     // Live positions of the fingers currently down (window coordinates).
     inline std::map<SDL_FingerID, SDL_Point> s_finger_pos;
 
+    // Recent press history (capped): every finger-down leaves a small dot -
+    // red where it hit nothing, blue where it hit a control. One screenshot
+    // after natural play shows the MAP of where the tester's taps actually
+    // land, not just the last one.
+    struct Mark
+    {
+        int x = 0;
+        int y = 0;
+        bool hit = false;
+        Uint32 tick = 0;
+    };
+    inline std::vector<Mark> s_marks;
+
+    inline void noteDown(int x, int y, bool hit, Uint32 now)
+    {
+        if (s_marks.size() >= 24)
+            s_marks.erase(s_marks.begin());
+        s_marks.push_back(Mark{x, y, hit, now});
+    }
+
     // Fingers whose SDL_FINGERDOWN was dropped because the window size was
     // not known yet. Their later motion is still processed, so a press held
     // a moment longer recovers instead of doing nothing at all.
@@ -407,6 +427,17 @@ namespace TouchOverlay
 
             Layout l = computeLayout(window_w, window_h);
             auto hit = hitTestAt(l, window_w, window_h, x, y);
+            // While a held direction drags across the neutral centre, keep the
+            // direction the finger is already holding: a real thumb slides a
+            // centimetre or two during a press, and dropping to CENTRE mid-hold
+            // made the tank/menu stop "for no reason" (the tester's "sometimes
+            // you have to hold longer"). Leaving the pad still releases.
+            if (event.type == SDL_FINGERMOTION && hit.first == EL_DPAD && hit.second < 0)
+            {
+                auto held = s_fingers.find(id);
+                if (held != s_fingers.end() && held->second.el == EL_DPAD && held->second.dir >= 0)
+                    hit = {EL_DPAD, held->second.dir};
+            }
             // Remember where the engine sees the finger (for the on-screen
             // marker) and, on a fresh press, what it resolved to. Motion must
             // not overwrite L: the last thing a tester cares about is what
@@ -420,6 +451,7 @@ namespace TouchOverlay
                     ++s_stat_miss;
                 else if (hit.first == EL_DPAD && hit.second < 0)
                     ++s_stat_centre;
+                noteDown(x, y, hit.first != EL_NONE, now);
             }
             setFinger(out, id, hit.first, hit.second, now);
             break;
@@ -471,6 +503,12 @@ namespace TouchOverlay
 
             Layout l = computeLayout(window_w, window_h);
             auto hit = hitTestAt(l, window_w, window_h, x, y);
+            if (event.type == SDL_MOUSEMOTION && hit.first == EL_DPAD && hit.second < 0)
+            {
+                auto held = s_fingers.find(MOUSE_FINGER);
+                if (held != s_fingers.end() && held->second.el == EL_DPAD && held->second.dir >= 0)
+                    hit = {EL_DPAD, held->second.dir};
+            }
             s_finger_pos[MOUSE_FINGER] = {x, y};
             if (event.type == SDL_MOUSEBUTTONDOWN)
             {
@@ -486,6 +524,7 @@ namespace TouchOverlay
                     ++s_stat_miss;
                 else if (hit.first == EL_DPAD && hit.second < 0)
                     ++s_stat_centre;
+                noteDown(x, y, hit.first != EL_NONE, now);
             }
             setFinger(out, MOUSE_FINGER, hit.first, hit.second, now);
             break;
@@ -631,6 +670,24 @@ namespace TouchOverlay
         }
 
         // --- tester diagnostics --------------------------------------------
+        // History dots: every recent press leaves a mark - red where it hit
+        // nothing, blue where it hit a control (up to 24, 30 seconds). One
+        // screenshot after natural play shows the whole MAP of taps.
+        for (const auto &m : s_marks)
+        {
+            const Uint32 age = SDL_GetTicks() - m.tick;
+            if (age >= 30000)
+                continue;
+            Uint8 a = 200;
+            if (age > 25000)
+                a = static_cast<Uint8>(200 * (30000 - age) / 5000);
+            if (m.hit)
+                SDL_SetRenderDrawColor(renderer, 80, 140, 255, a);
+            else
+                SDL_SetRenderDrawColor(renderer, 255, 70, 70, a);
+            fillCircle(renderer, m.x, m.y, std::max(5, h / 110));
+        }
+
         // A thick yellow ring around every finger that is still down (it
         // peeks out from under the thumb), plus a crosshair of the last
         // initial contact (green = it hit a control, red = it missed) that
