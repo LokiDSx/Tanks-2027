@@ -518,6 +518,26 @@ namespace TouchOverlay
         }
     }
 
+    // Thick circle outline, used to mark the live position of a finger:
+    // it is drawn wide enough to peek out from under a pressing thumb, where
+    // a small dot would simply be hidden by the finger itself.
+    inline void drawRing(SDL_Renderer *r, int cx, int cy, int radius, int thickness,
+                         Uint8 cr, Uint8 cg, Uint8 cb, Uint8 ca)
+    {
+        SDL_SetRenderDrawColor(r, cr, cg, cb, ca);
+        const int half = std::max(1, thickness / 2);
+        const double PI = 3.14159265358979323846;
+        for (int a = 0; a < 360; a += 3)
+        {
+            const double rad = a * PI / 180.0;
+            const int x1 = cx + static_cast<int>(std::cos(rad) * (radius - half));
+            const int y1 = cy + static_cast<int>(std::sin(rad) * (radius - half));
+            const int x2 = cx + static_cast<int>(std::cos(rad) * (radius + half));
+            const int y2 = cy + static_cast<int>(std::sin(rad) * (radius + half));
+            SDL_RenderDrawLine(r, x1, y1, x2, y2);
+        }
+    }
+
     inline void drawButton(SDL_Renderer *r, const SDL_Rect &rect, int radius, bool held,
                            Uint8 cr, Uint8 cg, Uint8 cb)
     {
@@ -611,27 +631,31 @@ namespace TouchOverlay
         }
 
         // --- tester diagnostics --------------------------------------------
-        // Dots under the fingers that are currently down, and a crosshair of
-        // the last press (green = it hit a control, red = it missed) that
-        // lingers for a few seconds. A photo of the phone taken right after
-        // a tap then shows exactly where the game saw it and whether the
-        // press was accepted - no cable or logcat needed.
+        // A thick yellow ring around every finger that is still down (it
+        // peeks out from under the thumb), plus a crosshair of the last
+        // initial contact (green = it hit a control, red = it missed) that
+        // lingers for ten seconds. Press-and-hold, then photograph the screen
+        // with the finger still touching: ring vs finger shows the live
+        // mapping, crosshair vs ring shows how much the contact point drifts
+        // during the press - either way one photo pins down the offset.
         const int dot_r = std::max(6, h / 150);
         for (const auto &p : s_finger_pos)
         {
             SDL_SetRenderDrawColor(renderer, 60, 255, 120, 220);
             fillCircle(renderer, p.second.x, p.second.y, dot_r);
+            drawRing(renderer, p.second.x, p.second.y,
+                     std::max(60, h / 5), 6, 255, 255, 0, 230);
         }
 
         if (s_last_down_tick != 0)
         {
-            const Uint32 LIFE_MS = 4000;
+            const Uint32 LIFE_MS = 10000;
             const Uint32 age = SDL_GetTicks() - s_last_down_tick;
             if (age < LIFE_MS)
             {
                 Uint8 a = 255;
-                if (age > LIFE_MS - 1000)
-                    a = static_cast<Uint8>(255 * (LIFE_MS - age) / 1000);
+                if (age > LIFE_MS - 2000)
+                    a = static_cast<Uint8>(255 * (LIFE_MS - age) / 2000);
                 if (s_last_down_hit)
                     SDL_SetRenderDrawColor(renderer, 60, 255, 90, a);
                 else
