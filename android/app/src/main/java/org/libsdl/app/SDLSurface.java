@@ -38,13 +38,6 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     // Keep track of the surface size to normalize touch events
     protected float mWidth, mHeight;
 
-    // Screen-absolute normalization: view location on screen + real display size.
-    // If the view doesn't cover the whole display (or is offset by system bars),
-    // normalizing by the view size alone shifts touch coordinates towards the
-    // screen center; using absolute screen coordinates keeps taps where they are.
-    protected final int[] mLoc = new int[2];
-    protected float mNormW, mNormH;
-
     // On-screen diagnostics: first taps print geometry to a Toast (logcat is not
     // available when testing on a phone without a PC connection).
     protected int mToastTaps = 0;
@@ -71,8 +64,6 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         // Some arbitrary defaults to avoid a potential division by zero
         mWidth = 1.0f;
         mHeight = 1.0f;
-        mNormW = 1.0f;
-        mNormH = 1.0f;
 
         mIsSurfaceReady = false;
     }
@@ -137,23 +128,6 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 nDeviceHeight = realMetrics.heightPixels;
             }
         } catch(Exception ignored) {
-        }
-
-        // Screen-absolute touch normalization basis: where the view sits on the
-        // display and the real display size. If view == display this is a no-op.
-        try {
-            getLocationOnScreen(mLoc);
-        } catch (Exception ignored) {
-            mLoc[0] = 0;
-            mLoc[1] = 0;
-        }
-        mNormW = (float) nDeviceWidth;
-        mNormH = (float) nDeviceHeight;
-        if (mNormW <= 0f || mNormH <= 0f) {
-            mNormW = width;
-            mNormH = height;
-            mLoc[0] = 0;
-            mLoc[1] = 0;
         }
 
         synchronized(SDLActivity.getContext()) {
@@ -270,8 +244,8 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 case MotionEvent.ACTION_MOVE:
                     for (i = 0; i < pointerCount; i++) {
                         pointerFingerId = event.getPointerId(i);
-                        x = (event.getX(i) + mLoc[0]) / mNormW;
-                        y = (event.getY(i) + mLoc[1]) / mNormH;
+                        x = event.getX(i) / mWidth;
+                        y = event.getY(i) / mHeight;
                         p = event.getPressure(i);
                         if (p > 1.0f) {
                             // may be larger than 1.0f on some devices
@@ -295,8 +269,8 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                     }
 
                     pointerFingerId = event.getPointerId(i);
-                    x = (event.getX(i) + mLoc[0]) / mNormW;
-                    y = (event.getY(i) + mLoc[1]) / mNormH;
+                    x = event.getX(i) / mWidth;
+                    y = event.getY(i) / mHeight;
                     p = event.getPressure(i);
                     if (p > 1.0f) {
                         // may be larger than 1.0f on some devices
@@ -306,16 +280,18 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                     SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
 
                     // Diagnostics for on-device testing (no logcat): show the
-                    // geometry on the first few taps.
+                    // geometry on the first few taps. "tap" is view-local -
+                    // the exact space SDL and the on-screen crosshair use, so
+                    // tap vs crosshair on one screenshot verifies the whole
+                    // chain. "view@" is the live screen position of the view.
                     if (action == MotionEvent.ACTION_DOWN && mToastTaps < 10) {
                         ++mToastTaps;
                         int[] loc = new int[2];
                         getLocationOnScreen(loc);
                         String msg = "surface " + (int) mWidth + "x" + (int) mHeight +
                                 " view@" + loc[0] + "," + loc[1] +
-                                " display " + (int) mNormW + "x" + (int) mNormH +
-                                " tap " + Math.round(event.getX(i) + loc[0]) + "," +
-                                Math.round(event.getY(i) + loc[1]);
+                                " tap " + Math.round(event.getX(i)) + "," +
+                                Math.round(event.getY(i));
                         Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                         Log.v("SDL", "touchDiag: " + msg);
                     }
@@ -324,8 +300,8 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 case MotionEvent.ACTION_CANCEL:
                     for (i = 0; i < pointerCount; i++) {
                         pointerFingerId = event.getPointerId(i);
-                        x = (event.getX(i) + mLoc[0]) / mNormW;
-                        y = (event.getY(i) + mLoc[1]) / mNormH;
+                        x = event.getX(i) / mWidth;
+                        y = event.getY(i) / mHeight;
                         p = event.getPressure(i);
                         if (p > 1.0f) {
                             // may be larger than 1.0f on some devices
