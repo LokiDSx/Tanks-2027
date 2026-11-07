@@ -125,9 +125,8 @@ private:
     // 1.2: Modern Classic (classic stages, the new bonus pool and the
     // hunter / base-killer pair kept on the field)
     bool m_modern_classic;
-    // The last stage of the classic campaign is won: the level does not
-    // finish, enemies keep spawning without a limit and the "YOU WIN!"
-    // banner is shown once
+    // The last stage of the classic campaign is won: the "YOU WIN!" banner
+    // is shown for a moment, then the game finishes (scores, then menu)
     bool m_you_won;
     Uint32 m_you_win_time;
     // No new enemies spawn once the stage is over (e.g. the Deathmatch base

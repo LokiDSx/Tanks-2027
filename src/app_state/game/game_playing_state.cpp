@@ -7,7 +7,7 @@ Game::PlayingState::PlayingState(Game *ps) : ContextState(ps, ps->m_game_state_m
 void Game::PlayingState::draw(Renderer &renderer)
 {
     m_context->drawScene(renderer);
-    // Victory banner of the last classic stage (over the endless play)
+    // Victory banner of the last classic stage (the game ends after it)
     m_context->drawYouWinMessage(renderer);
 }
 
@@ -17,16 +17,18 @@ void Game::PlayingState::update(const UpdateState &updateState)
 
     if (m_context->m_you_won)
     {
-        // The last stage was already won: keep counting the banner time,
-        // the level itself goes on forever (enemies keep spawning).
+        // The last stage was already won: show the "YOU WIN!" banner for
+        // a moment, then finish the game (scores screen, then the menu).
         m_context->m_you_win_time += updateState.delta_time;
+        if (m_context->m_you_win_time > AppConfig::Game::you_win_show_time)
+            transiteTo(new Game::StageEndingState(m_context, true, true));
     }
     else if (m_context->hostileEnemiesEmpty() && m_context->m_enemies_to_kill_count <= 0)
     {
         if (m_context->isLastClassicStage())
         {
-            // Campaign cleared: the game does not finish, it turns into
-            // the endless victory play with a "YOU WIN!" banner.
+            // Campaign cleared: the "YOU WIN!" banner goes up first, the
+            // game itself finishes right after it.
             m_context->startYouWin();
         }
         else

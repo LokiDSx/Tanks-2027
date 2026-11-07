@@ -139,8 +139,8 @@ namespace AppConfig
         inline unsigned stage_start_time        = 3200;
         inline unsigned stage_end_time          = 5000;
         inline double   game_over_message_speed = 0.13;
-        // "YOU WIN!" banner: how long the message stays on the screen
-        // (the slide-up eats the first ~3 seconds of it)
+        // "YOU WIN!" banner: how long it stays on the screen before the
+        // game finishes (the slide-up eats the first ~3 seconds of it)
         inline unsigned you_win_show_time       = 9000;
         // Deathmatch: respawn delay of the friendly tank after its death
         inline unsigned friend_respawn_time     = 2000;

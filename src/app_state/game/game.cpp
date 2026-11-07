@@ -779,13 +779,7 @@ void Game::generateEnemyIfPossible(Uint32 dt)
         return;
 
     m_new_enemy_cooldown += dt;
-    // After "YOU WIN!" the last stage never runs out of enemies: the
-    // counter stays at zero, so the cap on the map is what limits the flow.
-    long unsigned allowed_enemies_count;
-    if (m_you_won)
-        allowed_enemies_count = AppConfig::enemies_max_count_on_map;
-    else
-        allowed_enemies_count = AppConfig::enemies_max_count_on_map < m_enemies_to_kill_count ? AppConfig::enemies_max_count_on_map : m_enemies_to_kill_count;
+    long unsigned allowed_enemies_count = AppConfig::enemies_max_count_on_map < m_enemies_to_kill_count ? AppConfig::enemies_max_count_on_map : m_enemies_to_kill_count;
 
     // The ally does not take a spawn slot of the real enemies
     long unsigned active_enemies_count = 0;
@@ -1063,8 +1057,8 @@ bool Game::isLastClassicStage() const
 
 void Game::startYouWin()
 {
-    // The level keeps running: enemies respawn without a limit from now on,
-    // only the "YOU WIN!" banner marks the victory.
+    // The banner goes up now; PlayingState finishes the game once it has
+    // been shown (scores screen, then back to the menu).
     m_you_won = true;
     m_you_win_time = 0;
 
