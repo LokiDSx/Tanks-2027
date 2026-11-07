@@ -5,10 +5,11 @@
 #include "game/game.h"
 #include "menu.h"
 
-StageSelect::StageSelect(int players_count, InteractiveComponents interactive_components, StateMachine *state_machine)
+StageSelect::StageSelect(int players_count, InteractiveComponents interactive_components, StateMachine *state_machine, bool modern_classic)
     : AppState(interactive_components, state_machine),
       m_players_count(players_count),
-      m_selected_stage(1)
+      m_selected_stage(1),
+      m_modern_classic(modern_classic)
 {
 }
 
@@ -60,7 +61,10 @@ void StageSelect::eventProcess(const Event &event)
     }
     else if (ev.isPressed(KeyCode::KEY_SPACE) || ev.isPressed(KeyCode::KEY_RETURN))
     {
-        transiteTo(new Game(m_players_count, m_selected_stage, m_interactive_components, m_state_machine));
+        // The mode flags come after the Deathmatch options in the Game
+        // constructor, so they are spelled out for the Modern Classic start.
+        transiteTo(new Game(m_players_count, m_selected_stage, m_interactive_components, m_state_machine,
+                            false, false, false, Game::DM_MEDIUM, true, m_modern_classic));
     }
     else if (ev.isPressed(KeyCode::KEY_ESCAPE))
     {

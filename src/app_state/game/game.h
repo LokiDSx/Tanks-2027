@@ -24,8 +24,10 @@ public:
         DM_HARD = 2,
     };
 
-    Game(int players_count, int starting_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated = false, bool survival = false, bool deathmatch = false, int deathmatch_difficulty = DM_MEDIUM, bool friend_enabled = true);
-    Game(std::vector<Player *> players, int previous_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated = false, bool survival = false, bool deathmatch = false, int deathmatch_difficulty = DM_MEDIUM, bool friend_enabled = true);
+    // modern_classic: the 1.2 mode with all the levels of the classic
+    // campaign, the new bonus pool and the hunter / base-killer pair
+    Game(int players_count, int starting_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated = false, bool survival = false, bool deathmatch = false, int deathmatch_difficulty = DM_MEDIUM, bool friend_enabled = true, bool modern_classic = false);
+    Game(std::vector<Player *> players, int previous_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated = false, bool survival = false, bool deathmatch = false, int deathmatch_difficulty = DM_MEDIUM, bool friend_enabled = true, bool modern_classic = false);
     ~Game();
 
     void draw(Renderer &renderer) override;
@@ -84,6 +86,16 @@ private:
     // Drone bonus: freeze the game and let the player pick a tank to destroy
     void startDroneTargeting(Player *player);
 
+    // Classic / Modern Classic: this stage is the last one of the campaign
+    // (35, 70, ... - the stage files cycle, but the count never resets)
+    bool isLastClassicStage() const;
+    // The last stage is cleared: the campaign is won, but the game goes on
+    void startYouWin();
+    // Draws the "YOU WIN!" banner over the scene (PlayingState only)
+    void drawYouWinMessage(Renderer &renderer);
+    // True when no hostile tank is left (the ally does not count)
+    bool hostileEnemiesEmpty() const;
+
     StateMachine *m_game_state_machine;
     StageEnvironment *m_stage_environment;
 
@@ -110,6 +122,14 @@ private:
     // Deathmatch setup: difficulty and whether the friendly tank spawns
     int m_deathmatch_difficulty;
     bool m_friend_enabled;
+    // 1.2: Modern Classic (classic stages, the new bonus pool and the
+    // hunter / base-killer pair kept on the field)
+    bool m_modern_classic;
+    // The last stage of the classic campaign is won: the level does not
+    // finish, enemies keep spawning without a limit and the "YOU WIN!"
+    // banner is shown once
+    bool m_you_won;
+    Uint32 m_you_win_time;
     // No new enemies spawn once the stage is over (e.g. the Deathmatch base
     // was destroyed while the stage ending state is still updating the scene)
     bool m_stage_finished;

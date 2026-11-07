@@ -148,12 +148,14 @@ namespace
                     AppConfig::sound_enabled = (value != 0);
                 else if (key == "highscore_classic")
                     HighScore::scores[0] = value;
-                else if (key == "highscore_generated")
+                else if (key == "highscore_modern")
                     HighScore::scores[1] = value;
-                else if (key == "highscore_survival")
+                else if (key == "highscore_generated")
                     HighScore::scores[2] = value;
-                else if (key == "highscore_deathmatch")
+                else if (key == "highscore_survival")
                     HighScore::scores[3] = value;
+                else if (key == "highscore_deathmatch")
+                    HighScore::scores[4] = value;
                 else if (key == "survival_tanks")
                     HighScore::survival_tanks = value;
             }
@@ -169,18 +171,20 @@ namespace
         if (file == nullptr)
             return false;
 
-        char buffer[320];
+        char buffer[384];
         int len = std::snprintf(buffer, sizeof(buffer),
                                 "widescreen=%d\n"
                                 "sound=%d\n"
                                 "highscore_classic=%u\n"
+                                "highscore_modern=%u\n"
                                 "highscore_generated=%u\n"
                                 "highscore_survival=%u\n"
                                 "highscore_deathmatch=%u\n"
                                 "survival_tanks=%u\n",
                                 AppConfig::widescreen ? 1 : 0,
                                 AppConfig::sound_enabled ? 1 : 0,
-                                HighScore::scores[0], HighScore::scores[1], HighScore::scores[2], HighScore::scores[3],
+                                HighScore::scores[0], HighScore::scores[1], HighScore::scores[2],
+                                HighScore::scores[3], HighScore::scores[4],
                                 HighScore::survival_tanks);
         if (len > 0)
             SDL_RWwrite(file, buffer, 1, len);
@@ -190,7 +194,7 @@ namespace
 
     void resetToDefaults()
     {
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
             HighScore::scores[i] = 0;
         HighScore::survival_tanks = 0;
         AppConfig::widescreen = false;
@@ -380,7 +384,7 @@ unsigned Profile::bestScore(const std::string &name)
     // Read the records straight from the profile file without touching
     // the in-memory values of the active profile
     const std::string content = readFile(profilePath(name));
-    unsigned scores[4] = {0, 0, 0, 0};
+    unsigned scores[5] = {0, 0, 0, 0, 0};
 
     size_t pos = 0;
     while (pos < content.size())
@@ -397,18 +401,20 @@ unsigned Profile::bestScore(const std::string &name)
             const int value = std::atoi(line.substr(eq + 1).c_str());
             if (key == "highscore_classic")
                 scores[0] = value;
-            else if (key == "highscore_generated")
+            else if (key == "highscore_modern")
                 scores[1] = value;
-            else if (key == "highscore_survival")
+            else if (key == "highscore_generated")
                 scores[2] = value;
-            else if (key == "highscore_deathmatch")
+            else if (key == "highscore_survival")
                 scores[3] = value;
+            else if (key == "highscore_deathmatch")
+                scores[4] = value;
         }
         pos = eol + 1;
     }
 
     unsigned best = scores[0];
-    for (int i = 1; i < 4; i++)
+    for (int i = 1; i < 5; i++)
         if (scores[i] > best)
             best = scores[i];
     return best;

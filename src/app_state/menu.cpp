@@ -17,6 +17,7 @@ Menu::Menu(InteractiveComponents interactive_components, StateMachine *state_mac
     : AppState(interactive_components, state_machine)
 {
     m_menu_items.push_back("Classic Mode");
+    m_menu_items.push_back("Modern Classic");
     m_menu_items.push_back("Generated Mode");
     m_menu_items.push_back("Survival Mode");
     m_menu_items.push_back("Deathmatch Mode");
@@ -82,12 +83,13 @@ void Menu::draw(Renderer &renderer)
     }
 
     // High score of each game mode, right-aligned next to its menu item
-    // (the score rows follow the order of the game mode menu items).
+    // (the score rows follow the order of the game mode menu items, the
+    // first five items are the five recorded modes).
     // The survival row also shows the destroyed tanks record ([tanks][icon] score).
     // The white tank icon is used: the black one blends into the dark menu.
     const int score_right_margin = 8;
     Rect enemy_icon_src = SpriteConfig::getInstance().getSpriteData(ST_LEFT_ENEMY_WHITE).rect;
-    for (int mode = 0; mode < 4; mode++)
+    for (int mode = 0; mode < 5; mode++)
     {
         const std::string score_text = std::to_string(HighScore::scores[mode]);
         Size score_size = renderer.measureText(score_text, FontSize::NORMAL);
@@ -165,17 +167,21 @@ void Menu::eventProcess(const Event &event)
             }
             else if (m_current_menu_index == 1)
             {
-                transiteTo(new Game(1, 1, m_interactive_components, m_state_machine, true));
+                transiteTo(new StageSelect(1, m_interactive_components, m_state_machine, true));
             }
             else if (m_current_menu_index == 2)
             {
-                transiteTo(new Game(1, 1, m_interactive_components, m_state_machine, true, true));
+                transiteTo(new Game(1, 1, m_interactive_components, m_state_machine, true));
             }
             else if (m_current_menu_index == 3)
             {
-                transiteTo(new DeathmatchSetup(m_interactive_components, m_state_machine));
+                transiteTo(new Game(1, 1, m_interactive_components, m_state_machine, true, true));
             }
             else if (m_current_menu_index == 4)
+            {
+                transiteTo(new DeathmatchSetup(m_interactive_components, m_state_machine));
+            }
+            else if (m_current_menu_index == 5)
             {
                 transiteTo(new Settings(m_interactive_components, m_state_machine));
             }

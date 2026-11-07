@@ -44,7 +44,8 @@ void Game::StageEndingState::update(const UpdateState &updateState)
                                          m_context->m_deathmatch,
                                          m_context->m_kills,
                                          m_context->m_deathmatch_difficulty,
-                                         m_context->m_friend_enabled));
+                                         m_context->m_friend_enabled,
+                                         m_context->m_modern_classic));
     }
 }
 

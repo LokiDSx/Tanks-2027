@@ -8,7 +8,7 @@
 #include "game/game.h"
 #include "menu.h"
 
-Scores::Scores(std::vector<Player *> players, int stage, bool game_over, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, unsigned tanks_killed, int deathmatch_difficulty, bool friend_enabled)
+Scores::Scores(std::vector<Player *> players, int stage, bool game_over, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, unsigned tanks_killed, int deathmatch_difficulty, bool friend_enabled, bool modern_classic)
     : AppState(interactive_components, state_machine),
       m_scores_state_machine(new StateMachine())
 {
@@ -21,6 +21,7 @@ Scores::Scores(std::vector<Player *> players, int stage, bool game_over, Interac
     m_tanks_killed = tanks_killed;
     m_deathmatch_difficulty = deathmatch_difficulty;
     m_friend_enabled = friend_enabled;
+    m_modern_classic = modern_classic;
 
     m_score_counter = 0;
     m_max_score = 0;
@@ -37,6 +38,8 @@ HighScore::Mode Scores::highScoreMode() const
         return HighScore::Mode::Survival;
     if (m_deathmatch)
         return HighScore::Mode::Deathmatch;
+    if (m_modern_classic)
+        return HighScore::Mode::ModernClassic;
     if (m_generated)
         return HighScore::Mode::Generated;
     return HighScore::Mode::Classic;
@@ -136,7 +139,7 @@ void Scores::transiteToNextState()
     }
     else
     {
-        Game *g = new Game(m_players, m_stage, m_interactive_components, m_state_machine, m_generated, m_survival, m_deathmatch, m_deathmatch_difficulty, m_friend_enabled);
+        Game *g = new Game(m_players, m_stage, m_interactive_components, m_state_machine, m_generated, m_survival, m_deathmatch, m_deathmatch_difficulty, m_friend_enabled, m_modern_classic);
         transiteTo(g);
     }
 }

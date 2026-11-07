@@ -11,7 +11,7 @@
 class Scores : public AppState
 {
 public:
-    Scores(std::vector<Player *> players, int stage, bool game_over, InteractiveComponents interactive_components, StateMachine *parent_state_machine, bool generated = false, bool survival = false, bool deathmatch = false, unsigned tanks_killed = 0, int deathmatch_difficulty = Game::DM_MEDIUM, bool friend_enabled = true);
+    Scores(std::vector<Player *> players, int stage, bool game_over, InteractiveComponents interactive_components, StateMachine *parent_state_machine, bool generated = false, bool survival = false, bool deathmatch = false, unsigned tanks_killed = 0, int deathmatch_difficulty = Game::DM_MEDIUM, bool friend_enabled = true, bool modern_classic = false);
     ~Scores() override;
 
     void draw(Renderer &renderer) override;
@@ -40,6 +40,8 @@ private:
     // Deathmatch: setup options carried over to the next stage
     int m_deathmatch_difficulty;
     bool m_friend_enabled;
+    // Modern Classic: carried over to the next stage like the other modes
+    bool m_modern_classic;
     unsigned m_score_counter;
     unsigned m_max_score;
 

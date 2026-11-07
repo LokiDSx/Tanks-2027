@@ -15,7 +15,7 @@
 #include <cmath>
 #include <climits>
 
-Game::Game(int players_count, int starting_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, int deathmatch_difficulty, bool friend_enabled)
+Game::Game(int players_count, int starting_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, int deathmatch_difficulty, bool friend_enabled, bool modern_classic)
     : AppState(interactive_components, state_machine),
       m_game_state_machine(new StateMachine()),
       m_generated(generated),
@@ -23,6 +23,9 @@ Game::Game(int players_count, int starting_stage, InteractiveComponents interact
       m_deathmatch(deathmatch),
       m_deathmatch_difficulty(deathmatch_difficulty),
       m_friend_enabled(friend_enabled),
+      m_modern_classic(modern_classic),
+      m_you_won(false),
+      m_you_win_time(0),
       m_stage_finished(false),
       m_friend(nullptr),
       m_friend_respawn_time(0),
@@ -40,7 +43,7 @@ Game::Game(int players_count, int starting_stage, InteractiveComponents interact
     m_show_enemies_targets = false;
 }
 
-Game::Game(std::vector<Player *> players, int previous_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, int deathmatch_difficulty, bool friend_enabled)
+Game::Game(std::vector<Player *> players, int previous_stage, InteractiveComponents interactive_components, StateMachine *state_machine, bool generated, bool survival, bool deathmatch, int deathmatch_difficulty, bool friend_enabled, bool modern_classic)
     : AppState(interactive_components, state_machine),
       m_game_state_machine(new StateMachine()),
       m_generated(generated),
@@ -48,6 +51,9 @@ Game::Game(std::vector<Player *> players, int previous_stage, InteractiveCompone
       m_deathmatch(deathmatch),
       m_deathmatch_difficulty(deathmatch_difficulty),
       m_friend_enabled(friend_enabled),
+      m_modern_classic(modern_classic),
+      m_you_won(false),
+      m_you_win_time(0),
       m_stage_finished(false),
       m_friend(nullptr),
       m_friend_respawn_time(0),
@@ -239,9 +245,10 @@ void Game::drawEnemy(Renderer &renderer, Enemy *enemy)
 void Game::drawGameStatusPanel(Renderer &renderer)
 {
     // enemies left to kill (not shown in survival and deathmatch - there are
-    // infinitely many; those modes show the destroyed tanks counter instead)
+    // infinitely many; those modes and the endless "YOU WIN!" play show the
+    // destroyed tanks counter instead)
     Rect enemy_left_src = SpriteConfig::getInstance().getSpriteData(ST_LEFT_ENEMY).rect;
-    if (!m_survival && !m_deathmatch)
+    if (!m_survival && !m_deathmatch && !m_you_won)
     {
         for (int i = 0; i < m_enemies_to_kill_count; i++)
         {
@@ -654,12 +661,11 @@ void Game::updateObjects(Uint32 dt)
 
 void Game::countKill()
 {
-    if (!m_survival && !m_deathmatch)
-        return;
-
+    // The kill counter drives the survival/deathmatch waves and the status
+    // panel of the endless "YOU WIN!" play; it is tracked in every mode.
     m_kills++;
     // Survival/deathmatch waves: every 5 kills the enemies get tougher.
-    if (m_kills % 5 == 0 && m_current_stage < (int)AppConfig::stages_count)
+    if ((m_survival || m_deathmatch) && m_kills % 5 == 0 && m_current_stage < (int)AppConfig::stages_count)
         m_current_stage++;
 }
 
@@ -773,7 +779,13 @@ void Game::generateEnemyIfPossible(Uint32 dt)
         return;
 
     m_new_enemy_cooldown += dt;
-    long unsigned allowed_enemies_count = AppConfig::enemies_max_count_on_map < m_enemies_to_kill_count ? AppConfig::enemies_max_count_on_map : m_enemies_to_kill_count;
+    // After "YOU WIN!" the last stage never runs out of enemies: the
+    // counter stays at zero, so the cap on the map is what limits the flow.
+    long unsigned allowed_enemies_count;
+    if (m_you_won)
+        allowed_enemies_count = AppConfig::enemies_max_count_on_map;
+    else
+        allowed_enemies_count = AppConfig::enemies_max_count_on_map < m_enemies_to_kill_count ? AppConfig::enemies_max_count_on_map : m_enemies_to_kill_count;
 
     // The ally does not take a spawn slot of the real enemies
     long unsigned active_enemies_count = 0;
@@ -892,6 +904,27 @@ void Game::generateEnemyIfPossible(Uint32 dt)
             e->makeBaseKiller();
         }
     }
+    else if (m_modern_classic)
+    {
+        // Modern Classic keeps exactly one hunter and one base killer on
+        // the field: a killed specialist takes the next free spawn, the
+        // rest of the wave spawns as usual.
+        bool has_hunter = false;
+        bool has_base_killer = false;
+        for (auto other : m_enemies)
+        {
+            if (other->friendly() || other->to_erase)
+                continue;
+            if (other->hunter())
+                has_hunter = true;
+            if (other->baseKiller())
+                has_base_killer = true;
+        }
+        if (!has_hunter)
+            e->makeHunter();
+        else if (!has_base_killer)
+            e->makeBaseKiller();
+    }
     m_enemy_respown_position++;
     if (m_enemy_respown_position >= starting_points.size())
         m_enemy_respown_position = 0;
@@ -910,6 +943,9 @@ void Game::generateBonus()
     // Bonus pools per mode. The new bonuses were appended after ST_BONUS_BOAT
     // in the enum, so the range has to end on the last one available here:
     //   classic .............. original set, up to the boat
+    //   modern classic ....... + drone strike and the ally bonus (all the
+    //                          new ones - the ally itself only ever comes
+    //                          from a bonus in this mode)
     //   generated ............ + drone strike and the ally bonus
     //   survival ............. like generated, but without the boat bonus
     //   deathmatch ........... + drone strike only (the ally is already a
@@ -930,7 +966,7 @@ void Game::generateBonus()
         SpriteType last_bonus;
         if (m_deathmatch)
             last_bonus = ST_BONUS_DRONE;
-        else if (m_generated)
+        else if (m_generated || m_modern_classic)
             last_bonus = ST_BONUS_FRIEND;
         else
             last_bonus = ST_BONUS_BOAT;
@@ -1015,4 +1051,47 @@ void Game::startDroneTargeting(Player *player)
     m_pending_drone_player = nullptr;
     m_game_state_machine->setState(new Game::DroneTargetState(this));
     static_cast<Game::DroneTargetState *>(m_game_state_machine->current_state)->setOwner(player);
+}
+
+bool Game::isLastClassicStage() const
+{
+    // Both classic modes share the 35 stage files: the campaign is won on
+    // the stage right before the files would wrap around to stage 1.
+    return !m_generated && !m_survival && !m_deathmatch &&
+           (m_current_stage % (int)AppConfig::stages_count) == 0;
+}
+
+void Game::startYouWin()
+{
+    // The level keeps running: enemies respawn without a limit from now on,
+    // only the "YOU WIN!" banner marks the victory.
+    m_you_won = true;
+    m_you_win_time = 0;
+
+    stopSound(SoundConfig::PLAYER_IDLE);
+    stopSound(SoundConfig::PLAYER_MOVING);
+    playSound(SoundConfig::HIGHSCORE_BEATEN);
+}
+
+void Game::drawYouWinMessage(Renderer &renderer)
+{
+    if (!m_you_won || m_you_win_time > AppConfig::Game::you_win_show_time)
+        return;
+
+    // Same slide-up as the GAME OVER text, then the banner holds for the
+    // rest of the show time while the endless wave keeps coming.
+    double y = AppConfig::map_rect.h - m_you_win_time * AppConfig::Game::game_over_message_speed;
+    if (y < 10)
+        y = 10;
+    renderer.drawText({-1, static_cast<int>(y)}, AppConfig::you_win_text, {255, 220, 0, 255}, FontSize::BIGGEST);
+}
+
+bool Game::hostileEnemiesEmpty() const
+{
+    // The ally lives in m_enemies too, but it never ends a stage: a modern
+    // classic run with a friend bonus out must still detect the victory.
+    for (auto enemy : m_enemies)
+        if (!enemy->friendly())
+            return false;
+    return true;
 }
